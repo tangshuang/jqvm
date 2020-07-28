@@ -9,8 +9,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://gitee.com/frustigor/jqvm.git"
+    "url": "https://github.com/tangshuang/jqvm.git"
   },
+  "bugs": {
+    "url": "https://github.com/tangshuang/jqvm/issues"
+  },
+  "homepage": "https://github.com/tangshuang/jqvm#readme",
   "keywords": [
     "jQuery",
     "reactive",
