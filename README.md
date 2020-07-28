@@ -17,6 +17,8 @@ You can use cdn of unpkg.
 
 ## Usage
 
+There is a small [demo](https://unpkg.com/jqvm/index.html), you can try it online.
+
 **step 1: template**
 
 You should define your template in your html.
