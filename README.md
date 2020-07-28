@@ -77,15 +77,30 @@ Here, you call the `on` method and pass a callback function to change `vm`, and 
 JQVM is a jQuery plugin first at all, you should use code like this:
 
 ```js
-$('#app').vm(initState)
+const view = $('#app').vm(initState)
 ```
 
 The return value is a `view` object which has methods:
 
 - on(events, selector?, callback): bind listener, notice, callback is different from jQuery.fn.on, I will show detail later
 - off(events, selector?, callback): unbind listener which is bound by `on`
-- mount(): mount view into DOM
+- mount(el?): mount view into DOM
 - unmount(): destroy view in DOM, `vm` is unusable until you invoke `mount` again
+
+The `mount` method can receive a selector or a jquery element.
+
+```js
+const template = `
+  <template>
+    <div>{{title}}</div>
+  </template>
+`
+$(template)
+  .vm({ title: 'xxx' })
+  .mount('#app')
+```
+
+When `el` is passed, the view will be rendered in the target element (replace the innerHTML). If `el` is not passed, you should select a element in DOM and the view will be rendered after the selected element (as the beginning code do).
 
 Now, let look into `callback` detail.
 
@@ -102,6 +117,8 @@ function callback(vm) {
     const $el = $(this)
   }
 }
+
+view.on('click', '.some', callback)
 ```
 
 When you do not pass `selector`, it is different from jQuery.fn.on, this way bind listener to inside events:
@@ -110,7 +127,8 @@ When you do not pass `selector`, it is different from jQuery.fn.on, this way bin
 - unmount: when you invoke `view.unmount()`
 
 ```js
-$('#app').vm({ name: 'some' })
+$('#app')
+  .vm({ name: 'some' })
   .on('mount', vm => {
     vm.name = 'new name'
   })
@@ -192,6 +210,80 @@ $('#app')
 ```
 
 This is what you can do with JQVM.
+
+## Component
+
+You can invoke `component` to create a new tag.
+
+```js
+const { component } = $.vm
+
+component('icon', function(el, attrs) {
+  // notice the el is a copy from template
+  const { type } = attrs
+  // return new html to render
+  return `<i class="icon icon-${type}"></i>`
+})
+```
+
+Now you can use this `icon` component in template:
+
+```html
+<template id="app">
+  <icon type="search"></icon>
+</template>
+```
+
+## Directive
+
+You can invoke `directive` to create a new attribute.
+
+```js
+const { directive } = $.vm
+
+directive('jq-link', function(el, attrs) {
+  const link = attrs['jq-link']
+  el.attr('href', link)
+  // if you return a string, it will be used as this tag's new content
+  // if you do not return anthing, el will be used as content
+})
+```
+
+```html
+<template id="app">
+  <a jq-link="xxx">link</a>
+</template>
+```
+
+*Notice that, `el` is a copy element in `directive` and `component`, it is not in real DOM, so you should not bind events on it, binding will not work!*
+
+**BuiltIn Directives**
+
+Here are builtin directives:
+
+- jq-if="!!exp" | whehter to show this tag
+- jq-class="{ 'some-class': !!some }" | whether patch classes to tag
+- jq-value="prop" | only used on `input[type=text]` `select` `textarea`
+- jq-disabled | only used on `input` `select` `textarea` `button`
+- jq-checked | only used on `input[type=checkboxe]` `input[type=radio]`
+- jq-selected | only used on `select > option`
+- jq-src | only used on `img`, you should always use jq-src instead of `src`
+- jq-repeat | print serval times
+
+The `jq-repeat` usage is a little complex:
+
+```html
+<div jq-repeat="data" repeat-value="item" repeat-scope="{
+  some: some,
+  any: any
+}">
+  <span>{{item.name}}</span>
+  <span>{{some.time}}</span>
+  <span>{{any.num}}</span>
+</div>
+```
+
+You can use `repeat-key` `repeat-value` `repeat-scope` together with `jq-repeat`.
 
 ## License
 
