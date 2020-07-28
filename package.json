@@ -1,0 +1,32 @@
+{
+  "name": "jqvm",
+  "version": "0.0.2",
+  "description": "Reactive frontend framework based on jQuery.",
+  "main": "dist/jqvm.js",
+  "scripts": {
+    "build": "webpack",
+    "dev": "webpack-dev-server --config webpack.dev.config.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/frustigor/jqvm.git"
+  },
+  "keywords": [
+    "jQuery",
+    "reactive",
+    "framework"
+  ],
+  "author": "frustigor",
+  "license": "MIT",
+  "dependencies": {
+    "etx": "^5.1.1",
+    "jquery": "^3.5.1",
+    "scopex": "^1.1.1",
+    "tyshemo": "^8.8.0"
+  },
+  "devDependencies": {
+    "webpack": "^4.44.0",
+    "webpack-cli": "^3.3.12",
+    "webpack-dev-server": "^3.11.0"
+  }
+}

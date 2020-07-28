@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      section {
+        margin-bottom: 40px;
+      }
+    </style>
+  </head>
+  <body>
+    <template id="app">
+      <section>
+        <div jq-if="show">shown</div>
+        <div jq-if="!show">hidden</div>
+        <button class="toggle">toggle</button>
+      </section>
+
+      <section>
+        <div>{{title}}</div>
+        <div><input jq-value="title" data-title-input></div>
+      </section>
+
+      <section>
+        <div><pre>{{text}}</pre></div>
+        <div><textarea jq-value="text" data-text-input></textarea></div>
+      </section>
+
+      <section>
+        <div>
+          <label>
+            <input type="checkbox" jq-checked="checked" data-checkbox>
+            Item1 {{checked}}
+          </label>
+        </div>
+        <div>
+          <label>
+            <input type="radio" jq-checked="radio === 'a'" value="a" data-radio name="radio">
+            A
+          </label>
+          <label>
+            <input type="radio" jq-checked="radio === 'b'" value="b" data-radio name="radio">
+            B
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <div jq-repeat="items" repeat-value="item">{{item.name}}</div>
+      </section>
+    </template>
+
+    <div id="model"></div>
+
+    <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
+    <script src="dist/jqvm.min.js"></script>
+
+    <script>
+      $('#app')
+        .vm({
+          show: true,
+          title: 'This is title text!',
+          text: 'This is a long text, \nwhich has break wrodk',
+          checked: false,
+          radio: 'a',
+          items: [
+            { name: 'aaa' },
+            { name: 'bbb' },
+            { name: 'ccc' },
+          ],
+        })
+        .on('click', '.toggle', vm => () => vm.show = !vm.show)
+        .on('keyup', '[data-title-input]', vm => function(e) {
+          const value = e.target.value
+          vm.title = value
+        })
+        .on('keyup', '[data-text-input]', vm => function(e) {
+          const value = e.target.value
+          vm.text = value
+        })
+        .on('change', '[data-checkbox]', vm => function(e) {
+          vm.checked = !vm.checked
+        })
+        .on('change', '[name=radio]', vm => function(e) {
+          const value = e.target.value
+          vm.radio = value
+        })
+        .mount()
+
+      const { ViewModel } = $.vm
+      class Person extends ViewModel {
+        static name = {
+          default: '',
+        }
+        static age = {
+          default: 0,
+        }
+      }
+
+      const template = `
+        <template>
+          <div class="name">{{name}}</div>
+          <div class="age">{{age}}</div>
+          <button data-grow>Grow</button>
+          <button data-destroy>Destroy</button>
+        </template>
+      `
+      $(template)
+        .vm(Person)
+        .on('mount', vm => () => {
+          vm.name = 'timy'
+          vm.age = 12
+        })
+        .on('click', '[data-grow]', vm => () => {
+          vm.age ++
+        })
+        .on('click', '[data-destroy]', function() {
+          this.unmount()
+        })
+        .mount('#model')
+    </script>
+  </body>
+</html>
