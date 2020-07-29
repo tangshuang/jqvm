@@ -47,6 +47,10 @@
       <section>
         <div jq-repeat="items" repeat-value="item">{{item.name}}</div>
       </section>
+
+      <section>
+        <football color="#dd2311"></football>
+      </section>
     </template>
 
     <div id="model"></div>
@@ -56,6 +60,11 @@
     <script src="dist/jqvm.min.js"></script>
 
     <script>
+      $.vm.component('football', function($el, attrs) {
+        const { color } = attrs
+        return `<span style="color:${color}">football</span>`
+      })
+
       $('#app')
         .vm({
           show: true,

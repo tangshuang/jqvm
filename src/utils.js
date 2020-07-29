@@ -15,58 +15,13 @@ export function getOuterHTML(el) {
   return str
 }
 
-export function parseAttrs(source) {
-  const separator = /\s/
-	const str = source.trim().replace(/\n+/g, ' ').replace(/\s+/g, ' ')
-	const length = str.length
-	const attrs = []
-
-	let cursor = ''
-
-	let current = null
-	let type = 'key'
-
-  const reset = () => {
-		current = {
-			key: '',
-			value: ''
-		}
-		cursor = ''
-  }
-
-	reset()
-
-	for (let i = 0; i < length; i ++) {
-		let char = str.charAt(i)
-		let needPush = true
-
-		if (char === '"' || char === "'") {
-			if (!cursor) {
-				cursor = char
-				type = 'value'
-				needPush = false
-			}
-			else if (cursor === char) {
-				cursor = ''
-				type = 'key'
-				needPush = false
-			}
-		}
-
-		if (char === '=' && type === 'key') {
-			needPush = false
-		}
-
-		if (/[\w\W]/.test(char) && needPush) {
-			current[type] += type === 'key' && char === ' ' ? '' : char
-		}
-
-		if ((separator.test(char) && cursor === '') || i === length - 1) {
-			attrs.push(current)
-			reset()
-		}
-	}
-
+export function createAttrs(attributes) {
+	const oAttrs = Array.from(attributes)
+  const attrs = {}
+  oAttrs.forEach((node) => {
+    const { name, value } = node
+    attrs[name] = value
+	})
 	return attrs
 }
 

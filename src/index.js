@@ -3,7 +3,7 @@ import Store from 'tyshemo/src/store'
 import ScopeX from 'scopex'
 import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction } from 'ts-fns'
 
-import { getOuterHTML, parseAttrs, tryParseJSON } from './utils.js'
+import { getOuterHTML, tryParseJSON, createAttrs } from './utils.js'
 
 const components = {}
 const directives = {}
@@ -16,52 +16,32 @@ function directive(attr, link) {
   directives[attr] = link
 }
 
-function compileDirectives($wrapper, scopex) {
+// ----------- compiler ---------------
+
+const createIterator = (link, scopex) => function iterate() {
+  const $el = $(this)
+  const attrs = createAttrs(this.attributes)
+  const output = link.call(scopex, $el, attrs)
+  if (!isNone(output) && $el !== output) {
+    $el.replaceWith(output)
+  }
+}
+
+const compileDirectives = ($wrapper, scopex) => {
   const attrs = Object.keys(directives)
   attrs.forEach((attr) => {
     const link = directives[attr]
-    const els = $wrapper.find(`[${attr}]`)
-
-    els.each(function() {
-      const $el = $(this)
-
-      const oAttrs = Array.from(this.attributes)
-      const attrs = {}
-      oAttrs.forEach((node) => {
-        const { name, value } = node
-        attrs[name] = value
-      })
-
-      const output = link.call(scopex, $el, attrs)
-      if (!isNone(output) && $el !== output) {
-        $el.replaceWith(output)
-      }
-    })
+    const $els = $wrapper.find(`[${attr}]`)
+    $els.each(createIterator(link, scopex))
   })
 }
 
-function compileComponents($wrapper, scopex) {
+const compileComponents = ($wrapper, scopex) => {
   const names = Object.keys(components)
   names.forEach((name) => {
     const link = components[name]
-    const els = $wrapper.find(name)
-
-    els.each(function() {
-      const $el = $(this)
-      const outerHTML = this.outerHTML
-
-      const html = outerHTML.replace(new RegExp(`<${name}([\\s\\S]*?)>[\\s\\S]*?</${name}>`, 'gm'), (component, attrsStr) => {
-        const attrsArr = parseAttrs(attrsStr)
-        const attrs = {}
-        attrsArr.forEach(({ key, value}) => {
-          attrs[key] = value
-        })
-        const output = link.call(scopex, $el, attrs)
-        return output
-      })
-      const result = compile(html, scopex)
-      $el.replaceWith(result)
-    })
+    const $els = $wrapper.find(name)
+    $els.each(createIterator(link, scopex))
   })
 }
 
@@ -73,6 +53,8 @@ function compile(template, scopex) {
   const result = scopex.interpolate(innerHTML)
   return result
 }
+
+// ---------------- main ---------------
 
 function vm(initState) {
   const $this = $(this)
@@ -149,8 +131,6 @@ function vm(initState) {
     const active = document.activeElement
     const activeStart = active.selectionStart
     const activeEnd = active.selectionEnd
-    const activeTag = active.tagName.toLocaleLowerCase()
-    const activeType = active.type
 
     const result = compile(template, scopex)
     $container.html(result)
@@ -162,26 +142,22 @@ function vm(initState) {
 
       const $target = $container.find(`[jq-hash=${hash}]`)
       if ($target.length) {
+        const attrs = createAttrs($target[0].attributes)
+        $retainer.attr(attrs)
+        if ($retainer.is('textarea')) {
+          $retainer.text($target.text())
+        }
         $target.replaceWith($retainer)
       }
     })
 
     const $active = $(active)
     const hash = $active.attr('jq-hash')
-    if (hash && (activeTag === 'input' || activeTag === 'textarea')) {
-      if (activeTag === 'input' && ['checkbox', 'radio', 'range', 'color'].includes(activeType)) {
-        return
+    if (hash) {
+      active.focus()
+      if (activeStart) {
+        active.setSelectionRange(activeStart, activeEnd)
       }
-
-      const $target = $(`[jq-hash=${hash}]`)
-
-      if (!$target.length) {
-        return
-      }
-
-      const target = $target[0]
-      target.focus()
-      target.setSelectionRange(activeStart, activeEnd)
     }
   }
 
