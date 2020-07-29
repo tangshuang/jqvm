@@ -1,7 +1,7 @@
 import $ from 'jquery'
-import { Store, Model, TraceModel, Meta } from 'tyshemo'
+import Store from 'tyshemo/src/store'
 import ScopeX from 'scopex'
-import { getStringHash, isNone, each, isInheritedOf, isInstanceOf, isObject, isFunction } from 'ts-fns'
+import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction } from 'ts-fns'
 
 import { getOuterHTML, parseAttrs, tryParseJSON } from './utils.js'
 
@@ -122,17 +122,7 @@ function vm(initState) {
       initState = initState()
     }
 
-    if (isInheritedOf(initState, Model)) {
-      store = new initState()
-      scope = store
-      scopex = new ScopeX(scope)
-    }
-    else if (isInstanceOf(initState, Model)) {
-      store = initState
-      scope = store
-      scopex = new ScopeX(scope)
-    }
-    else if (isInstanceOf(initState, Store)) {
+    if (isInstanceOf(initState, Store)) {
       store = initState
       scope = store.state
       scopex = new ScopeX(scope)
@@ -143,7 +133,9 @@ function vm(initState) {
       scopex = new ScopeX(scope)
     }
     else {
-      throw new TypeError('initState is not match required type')
+      store = initState
+      scope = initState
+      scopex = new ScopeX(scope)
     }
   }
 
@@ -410,18 +402,15 @@ directive('jq-repeat', function(el, attrs) {
 
 // --------------------------------
 
-class ViewModel extends TraceModel {}
 class View {}
 
 $.fn.vm = vm
 $.vm = {
   component,
   directive,
-  ViewModel,
-  Meta,
   Store,
   View,
 }
 
-export { vm }
+export { vm, Store, component, directive, View }
 export default vm

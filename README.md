@@ -72,7 +72,6 @@ Here, you call the `on` method and pass a callback function to change `vm`, and 
 - component(name, link): component register function
 - directive(name, link): directive register function
 - Store: store constructor
-- ViewModel: vm base constructor, you should use `extends` to create a new sub ViewModel
 
 ### $.fn.vm
 
@@ -145,9 +144,7 @@ It is from `initState` which is received by `$('#app').vm(initState)`, It can be
 
 - object: a normal object which is used to be initialize vm's backend state.
 - store: an instance of `Store`
-- vm: an instance of `ViewModel`
-- ViewModel: a class extended from `ViewModel`
-- function: which returns one of above
+- function: which returns one of above or other objects
 
 When you pass a normal object, the original object will be changed by vm. This make it shared amoung different mounting. To prevent this, you can use a function to return a independent object in the function.
 
@@ -163,15 +160,44 @@ view.mount() // use `init` to generate independent initState
 
 I will detail `Store` and `ViewModel` in following parts.
 
-## Store/ViewModel
+## Store
 
-First at all, you should read [tyshemo](https://tyshemo.js.org) to know how to use `Store` and `Model`.
-The only thing you should know is `ViewModel` is extended from `TraceModel`.
+```js
+const { Store } = $.vm
+const store = new Store({
+  ...
+})
+$('#app')
+  .vm(store)
+  .mount()
+```
+
+This make vm shared, the `store` will be used again amoung mountings.
+
+```js
+$('#app')
+  .vm(function() {
+    const { Store } = $.vm
+    const store = new Store({
+      ...
+    })
+    return store
+  })
+  .mount()
+```
+
+This make vm independent, it will create new one `store` in each mounting.
+
+You can know more about `Store` from [tyshemo](https://tyshemo.js.org).
+
+## ViewModel
+
+First at all, you should read [tyshemo](https://tyshemo.js.org) to know how to use `Model`.
 
 To use a ViewModel, you can provide more information in `on` callback.
 
 ```js
-const { ViewModel, Meta } = $.vm
+import { ViewModel, Meta } from 'tyshemo'
 
 class Name extends Meta {
   static default = 'tomy'
@@ -183,8 +209,12 @@ class Age extends Meta {
 }
 
 class Person extends ViewModel {
-  static name = Name
-  static age = Age
+  schema() {
+    return {
+      name: Name,
+      age: Age,
+    }
+  }
 
   state() {
     return {
@@ -202,7 +232,7 @@ class Person extends ViewModel {
 }
 
 $('#app')
-  .vm(Person)
+  .vm(new Person()) // shared vm, or .vm(() => new Person()) as indenpendent vm
   .on('click', '.grow', vm => () => vm.grow())
   .on('study', '.study', vm => (e) => {
     const book = {}
