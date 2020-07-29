@@ -303,6 +303,11 @@ function vm(initState) {
     })
   }
 
+  function find(selector) {
+    const $container = getMountNode()
+    return $container.find(selector)
+  }
+
   Object.assign(view, {
     once(...args) {
       bind(args, true)
@@ -319,6 +324,7 @@ function vm(initState) {
     mount,
     unmount,
     update,
+    find,
   })
   return view
 }
