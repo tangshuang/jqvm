@@ -1,5 +1,5 @@
 import $ from 'jquery'
-import Store from 'tyshemo/src/store'
+import ViewModel from 'tyshemo/src/store'
 import ScopeX from 'scopex'
 import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction } from 'ts-fns'
 
@@ -81,13 +81,13 @@ function vm(initState) {
       initState = initState()
     }
 
-    if (isInstanceOf(initState, Store)) {
+    if (isInstanceOf(initState, ViewModel)) {
       store = initState
       state = store.state
       scopex = new ScopeX(state)
     }
     else if (isObject(initState)) {
-      store = new Store(initState)
+      store = new ViewModel(initState)
       state = store.state
       scopex = new ScopeX(state)
     }
@@ -450,9 +450,9 @@ $.fn.vm = vm
 $.vm = {
   component,
   directive,
-  Store,
+  ViewModel,
   View,
 }
 
-export { vm, Store, component, directive, View }
+export { vm, component, directive, ViewModel, View }
 export default vm

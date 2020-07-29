@@ -54,14 +54,14 @@ Unlike vue.js, you should must bind event listeners in script, not in template.
 <script>
   $('#app')
     .vm({ title: 'Default Title' })
-    .on('click', '.title', vm => () => {
-      vm.title = 'New Title'
+    .on('click', '.title', state => {
+      state.title = 'New Title'
     })
     .mount()
 </script>
 ```
 
-Here, you call the `on` method and pass a callback function to change `vm`, and the view will be rerendered.
+Here, you call the `on` method and pass a callback function to change `state`, and the view will be rerendered.
 
 ## API
 
@@ -71,7 +71,8 @@ Here, you call the `on` method and pass a callback function to change `vm`, and 
 
 - component(name, link): component register function
 - directive(name, link): directive register function
-- Store: store constructor
+- ViewModel: vm constructor
+- View: view constructor
 
 ### $.fn.vm
 
@@ -81,13 +82,15 @@ JQVM is a jQuery plugin first at all, you should use code like this:
 const view = $('#app').vm(initState)
 ```
 
+JQVM will treat html in #app as template, so, it is recommended to use `template` tag to define template.
+
 The return value is a `view` object which has methods:
 
-- on(events, selector?, callback): bind listener, notice, callback is different from jQuery.fn.on, I will show detail later
+- on(events, selector?, callback): bind listeners, notice that callback is different from jQuery.fn.on, I will detail later
 - off(events, selector?, callback): unbind listener which is bound by `on`
 - mount(el?): mount view into DOM
 - unmount(): destroy view in DOM, `vm` is unusable until you invoke `mount` again
-- update(nextState): rerender
+- update(nextState): rerender, you can pass new state into `update()`, the new state will be merge into old state like react setState does.
 - find(selector): same as `$.fn.find`, select elements in view container
 
 The `mount` method can receive a selector or a jquery element.
@@ -100,19 +103,19 @@ const template = `
 `
 $(template)
   .vm({ title: 'xxx' })
-  .mount('#app')
+  .mount('div#app') // mount view to div#app
 ```
 
-When `el` is passed, the view will be rendered in the target element (replace the innerHTML). If `el` is not passed, you should select a element in DOM and the view will be rendered after the selected element (as the beginning code do).
+When selector is passed into `mount`, the view will be rendered in the target element (replace with innerHTML). If selector is not passed, you should select a element in DOM and the view will be rendered after the selected element (as the beginning code does).
 
-Now, let look into `callback` detail.
+Now, let's look into `callback` detail.
 
 ```js
 // a function which return a inner function
 function callback(state) {
   const view = this // view.unmount()
 
-  // handle function is used to be put into jQuery.fn.on as you did in `$('#app').on('click', handle)
+  // handle function which is put into jQuery.fn.on as you did like `$('#app').on('click', handle)`
   // handle function is optional, when you do not return handle function, callback will be invoked when the event happens, but you have no idea to receive DOM event
   return function handle(e) {
     const el = this
@@ -132,23 +135,26 @@ Inside events:
 ```js
 $('#app')
   .vm({ name: 'some' })
-  .on('mount', state => {
+  .on('$mount', state => {
     state.name = 'new name'
   })
   .mount()
 ```
 
-The `state` object you receive in callback function is a reactive object which is like vue's state. So you can change properties of it directly to trigger rerendering.
-And the scope in template is `state`, so when you write a `{{title}}` in template, you are calling `state.title` in fact.
-`state` is only available in `on` callback function.
+The `state` object you receive in callback function is a reactive object which is like what vue does. So you can change properties of it directly to trigger rerendering.
+And the scope in template is `state`, so when you write a `{{title}}` syntax in template, you are calling `state.title` in fact.
+`state` is only available in `on` callback functions.
 
-It is from `initState` which is received by `$('#app').vm(initState)`, It can be:
+It is created from `initState` which is received by `$('#app').vm(initState)`, `innitState` can be one of:
 
-- object: a normal object which is used to be initialize vm's state.
-- store: an instance of `Store`
-- function: which returns one of above or other objects
+- object: a normal object which is used to be vm's default state.
+- vm: an instance of `ViewModel`
+- function: which returns one of above
 
-When you pass a normal object, the original object will be changed by vm. This make it shared amoung different mounting. To prevent this, you can use a function to return a independent object in the function.
+*Notice, an instance of some class, for example `new Some()`, is not recommeded to pass in.*
+
+When you pass a normal object, the original object will be changed by vm. This make it shared amoung different mounting.
+To prevent this, you can use a function to return an independent object in the function.
 
 ```js
 const view = $('#app').vm(function init() {
@@ -157,52 +163,53 @@ const view = $('#app').vm(function init() {
 
 view.mount()
 view.unmount() // destory DOM
-view.mount() // use `init` to generate independent initState
+view.mount() // use `init` function to generate independent initState
 ```
 
-I will detail `Store` and `ViewModel` in following parts.
+I will detail `ViewModel` in following parts.
 
-## Store
+## ViewModel
 
 ```js
-const { Store } = $.vm
-const store = new Store({
+const { ViewModel } = $.vm
+const vm = new ViewModel({
   ...
 })
+
 $('#app')
-  .vm(store)
+  .vm(vm)
   .on('click', 'button', state => (e) => {
     state.name = 'new name'
   })
   .mount()
 ```
 
-This make vm shared, the `store` will be used again amoung mountings.
+This make vm shared, the `vm` will be used again amoung mountings.
 
 ```js
 $('#app')
   .vm(function() {
-    const { Store } = $.vm
-    const store = new Store({
+    const { ViewModel } = $.vm
+    const vm = new ViewModel({
       ...
     })
-    return store
+    return vm
   })
   .mount()
 ```
 
-This make vm independent, it will create new one `store` in each mounting.
+This make vm independent, it will create one new `vm` in each mounting.
 
-You can know more about `Store` from [tyshemo](https://tyshemo.js.org).
+`ViewModel` is extended from tyshemo's `Store`, you can know more from [tyshemo](https://tyshemo.js.org).
 
-## ViewModel
+## Model
 
 First at all, you should read [tyshemo](https://tyshemo.js.org) to know how to use `Model`.
 
-To use a ViewModel, you can provide more information in `on` callback.
+To use a Model, you can provide more information in `on` callback.
 
 ```js
-import { ViewModel, Meta } from 'tyshemo'
+import { Model, Meta } from 'tyshemo'
 
 class Name extends Meta {
   static default = 'tomy'
@@ -237,16 +244,18 @@ class Person extends ViewModel {
 }
 
 $('#app')
-  .vm(new Person()) // shared vm, or .vm(() => new Person()) as indenpendent vm
-  .on('click', '.grow', model => () => model.grow())
-  .on('study', '.study', model => (e) => {
-    const book = {}
+  .vm(new Person()) // shared, or .vm(() => new Person()) for indenpendent
+  .on('click', '.grow', model => {
+    model.grow()
+  })
+  .on('study', '.study', model => {
+    const book = new Book() // define Book somewhere
     model.study(book)
   })
   .mount()
 ```
 
-This is what you can do with JQVM.
+This is what you can do with `Model`.
 
 ## Component
 
@@ -282,7 +291,7 @@ directive('jq-link', function(el, attrs) {
   const link = attrs['jq-link']
   el.attr('href', link)
   // if you return a string, it will be used as this tag's new content
-  // if you do not return anthing, el will be used as content
+  // if you do not return anthing, `el` will be used as content
 })
 ```
 
@@ -298,22 +307,23 @@ directive('jq-link', function(el, attrs) {
 
 Here are builtin directives:
 
-- jq-if="!!exp" | whehter to show this tag
-- jq-class="{ 'some-class': !!some }" | whether patch classes to tag
-- jq-value="prop" | only used on `input[type=text]` `select` `textarea`
-- jq-disabled | only used on `input` `select` `textarea` `button`
-- jq-checked | only used on `input[type=checkboxe]` `input[type=radio]`
-- jq-selected | only used on `select > option`
-- jq-src | only used on `img`, you should always use jq-src instead of `src`
-- jq-repeat | print serval times
+- `jq-if="!!exp"` whehter to show this tag
+- `jq-class="{ 'some-class': !!exp }"` whether patch classes to tag
+- `jq-value="exp"` only used on `input[type=text]` `select` `textarea`
+- `jq-disabled="!!exp"` only used on `input` `select` `textarea` `button`
+- `jq-checked="!!exp"` only used on `input[type=checkbox]` `input[type=radio]`
+- `jq-selected="!!exp"` only used on `select > option`
+- `jq-src="exp"` only used on `img`, you should always use jq-src instead of `src`
+- `jq-repeat` print serval times
 
 The `jq-repeat` usage is a little complex:
 
 ```html
-<div jq-repeat="data" repeat-value="item" repeat-scope="{
+<div jq-repeat="data" repeat-value="item" repeat-key="index" repeat-scope="{
   some: some,
   any: any
 }">
+  <span>{{index + 1}}</span>
   <span>{{item.name}}</span>
   <span>{{some.time}}</span>
   <span>{{any.num}}</span>
