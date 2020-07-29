@@ -80,7 +80,9 @@ function vm(initState) {
   const hash = getStringHash(getOuterHTML(el))
   const container = `[jq-vm=${hash}]`
   const template = $this.html()
-  const getMountNode = () => mountTo ? $(mountTo) : $this.next(container)
+  const getMountNode = () => {
+    return mountTo ? $(mountTo) : $this.next(container)
+  }
 
   let store = null
   let scope = null
@@ -112,6 +114,23 @@ function vm(initState) {
       scope = initState
       scopex = new ScopeX(scope)
     }
+
+    $this.on('$mount', () => {
+      const $container = getMountNode()
+      callbacks.forEach((item) => {
+        const { action, info, callback } = item
+        $container[action](...info, callback)
+      })
+    })
+
+    $this.on('$unmount', () => {
+      const $container = getMountNode()
+      callbacks.forEach((item, i) => {
+        const { info, callback } = item
+        $container.off(...info, callback)
+        callbacks.splice(i, 1)
+      })
+    })
   }
 
   function destroy() {
@@ -168,6 +187,10 @@ function vm(initState) {
       return view
     }
 
+    if ($this.next(container).length) {
+      return view
+    }
+
     init()
 
     let $container = null
@@ -179,9 +202,6 @@ function vm(initState) {
       $container = $(el)
       $container.attr('jq-vm', hash)
     }
-    else if ($this.next(container).length) {
-      return view
-    }
     else {
       $container = $('<div />', {
         'jq-vm': hash,
@@ -191,10 +211,11 @@ function vm(initState) {
 
     render()
 
-    if (isFunction(store.watch)) {
+    if (typeof store.watch === 'function') {
       store.watch('*', render, true)
     }
 
+    $this.trigger('$mount')
     $container.trigger('$mount')
 
     return view
@@ -212,8 +233,9 @@ function vm(initState) {
     }
 
     $container.trigger('$unmount')
+    $this.trigger('$unmount')
 
-    if (isFunction(store.unwatch)) {
+    if (typeof store.unwatch === 'function') {
       store.unwatch('*', render)
     }
 
@@ -224,6 +246,8 @@ function vm(initState) {
     else {
       $container.remove()
     }
+
+    callbacks.length = 0
     mountTo = null
     isMounted = false
 
@@ -246,18 +270,15 @@ function vm(initState) {
   }
 
   function bind(args, once) {
-    const params = [...args]
-    const fn = params.pop()
+    const info = [...args]
+    const fn = info.pop()
     const callback = function(e) {
       const handle = fn.call(view, scope)
       return isFunction(handle) ? handle.call(this, e) : null
     }
-
-    const $container = getMountNode()
     const action = once ? 'one' : 'on'
 
-    $container[action](...params, callback)
-    callbacks.push([fn, callback])
+    callbacks.push({ action, info, fn, callback })
   }
 
   function unbind(args) {
@@ -267,17 +288,17 @@ function vm(initState) {
       return
     }
 
-    const params = [...args]
-    const fn = params.pop()
+    const info = [...args]
+    const fn = info.pop()
+    const $container = getMountNode()
+
     callbacks.forEach((item, i) => {
-      if (fn !== item[0]) {
+      const { info, callback } = item
+      if (fn !== item.fn) {
         return
       }
 
-      const callback = item[1]
-      const $container = getMountNode()
-
-      $container.off(...params, callback)
+      $container.off(...info, callback)
       callbacks.splice(i, 1)
     })
   }

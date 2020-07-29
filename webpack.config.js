@@ -28,12 +28,6 @@ const bundle = {
     usedExports: true,
     sideEffects: true,
   },
-  devServer: {
-    contentBase: __dirname,
-    port: 8099,
-    liveReload: true,
-    filename: 'dist/jqvm.min.js',
-  },
 }
 
 const mini = {

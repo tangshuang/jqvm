@@ -52,6 +52,7 @@
     <div id="model"></div>
 
     <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
+    <script src="https://unpkg.com/tyshemo/dist/tyshemo.min.js"></script>
     <script src="dist/jqvm.min.js"></script>
 
     <script>
@@ -86,8 +87,8 @@
         })
         .mount()
 
-      const { ViewModel } = $.vm
-      class Person extends ViewModel {
+      const { Model } = window.tyshemo
+      class Person extends Model {
         static name = {
           default: '',
         }
@@ -105,8 +106,8 @@
         </template>
       `
       $(template)
-        .vm(Person)
-        .on('mount', vm => () => {
+        .vm(new Person())
+        .on('$mount', vm => () => {
           vm.name = 'timy'
           vm.age = 12
         })
