@@ -1,8 +1,23 @@
-# JQVM
+<p align="center"><img src="jqvm.png" alt="jqvm" width="120" height="120"/></p>
+<h1 align="center">jQvm</h1>
+<p align="center">The world's easiest reactive frontend view-model framework based on jQuery.</p>
 
-A reactive frontend view-model framework based on jQuery.
+<br />
+<br />
+<br />
 
-## Install
+<p align="center"><img src="https://camo.githubusercontent.com/3b69fdf3e874a6cc64012c5a1a858767155a95d9/687474703a2f2f72616e646f6a732e636f6d2f696d616765732f64726f70536861646f772e706e67" width="100%"/></p>
+
+<br />
+<br />
+<br />
+<br />
+
+## :hear_no_evil:  What's all the jQvm?
+
+JQvm is a library, a jQuery plugin, a frontend reactive view-model framework, which helps JavasScript developers who are familiar with jQuery code more quickly. Boring with React, Vue? Want to taste reactive programming in frontend? Believe me, if you have learned jQuery, you can setup a small application in 10 seconds!
+
+## :rocket: Install
 
 ```
 npm i jqvm
@@ -15,7 +30,7 @@ You can use cdn of unpkg.
 <script src="https://unpkg.com/jqvm/dist/jqvm.min.js"></script>
 ```
 
-## Usage
+## :zap: Fast implementation
 
 There is a small [demo](https://unpkg.com/jqvm/index.html), you can try it online.
 
@@ -63,7 +78,7 @@ Unlike vue.js, you should must bind event listeners in script, not in template.
 
 Here, you call the `on` method and pass a callback function to change `state`, and the view will be rerendered.
 
-## API
+## :tada: API
 
 ### $.vm
 
@@ -168,7 +183,7 @@ view.mount() // use `init` function to generate independent initState
 
 I will detail `ViewModel` in following parts.
 
-## ViewModel
+## :truck: ViewModel
 
 ```js
 const { ViewModel } = $.vm
@@ -202,7 +217,7 @@ This make vm independent, it will create one new `vm` in each mounting.
 
 `ViewModel` is extended from tyshemo's `Store`, you can know more from [tyshemo](https://tyshemo.js.org).
 
-## Model
+## :bulb: Model
 
 First at all, you should read [tyshemo](https://tyshemo.js.org) to know how to use `Model`.
 
@@ -257,7 +272,7 @@ $('#app')
 
 This is what you can do with `Model`.
 
-## Component
+## :clown_face: Component
 
 You can invoke `component` to create a new tag.
 
@@ -280,7 +295,7 @@ Now you can use this `icon` component in template:
 </template>
 ```
 
-## Directive
+## :dizzy: Directive
 
 You can invoke `directive` to create a new attribute.
 
@@ -332,6 +347,6 @@ The `jq-repeat` usage is a little complex:
 
 You can use `repeat-key` `repeat-value` `repeat-scope` together with `jq-repeat`.
 
-## License
+## :see_no_evil: License
 
 MIT.
