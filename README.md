@@ -1,5 +1,4 @@
-<p align="center"><img src="jqvm.png" alt="jqvm" width="120" height="120"/></p>
-<h1 align="center">jQvm</h1>
+<h1 align="center"><img src="jqvm.png" alt="jqvm" width="120" height="120"/></h1>
 <p align="center">The world's easiest reactive frontend view-model framework based on jQuery.</p>
 
 <br />
