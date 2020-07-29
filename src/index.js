@@ -1,9 +1,9 @@
 import $ from 'jquery'
 import { Store, Model, TraceModel, Meta } from 'tyshemo'
 import ScopeX from 'scopex'
-import Etx from 'etx'
+import { getStringHash, isNone, each, isInheritedOf, isInstanceOf, isObject, isFunction } from 'ts-fns'
 
-import { getOuterHTML, parseAttrs, tryParseJSON, getStringHash, isNone, each, isInheritedOf, isInstanceOf, isObject, isFunction } from './utils.js'
+import { getOuterHTML, parseAttrs, tryParseJSON } from './utils.js'
 
 const components = {}
 const directives = {}
@@ -89,10 +89,10 @@ function vm(initState) {
   let mountTo = null
   let isMounted = false
 
-  const etx = new Etx()
   const callbacks = []
 
-  const view = {
+  const view = new View()
+  Object.assign(view, {
     once(...args) {
       bind(args, true)
       return view
@@ -115,7 +115,7 @@ function vm(initState) {
       destroy()
       return view
     },
-  }
+  })
 
   function init() {
     if (isFunction(initState)) {
@@ -223,7 +223,7 @@ function vm(initState) {
 
     render()
     store.watch('*', render, true)
-    etx.emit('mount', $container)
+    $container.trigger('$mount')
   }
 
   function unmount() {
@@ -237,7 +237,7 @@ function vm(initState) {
       return
     }
 
-    etx.emit('unmount', $container)
+    $container.trigger('$unmount')
     store.unwatch('*', render)
 
     if (mountTo) {
@@ -252,60 +252,40 @@ function vm(initState) {
   }
 
   function bind(args, once) {
-    const bind = once ? etx.once.bind(etx) : etx.on.bind(etx)
-    if (args.length === 2) {
-      const [type, fn] = args
-      const callback = function(e) {
-        const handle = fn.call(view, scope)
-        return isFunction(handle) ? handle.call(this, e) : null
-      }
-      bind(type, callback)
-      callbacks.push([fn, callback])
+    const params = [...args]
+    const fn = params.pop()
+    const callback = function(e) {
+      const handle = fn.call(view, scope)
+      return isFunction(handle) ? handle.call(this, e) : null
     }
-    else if (args.length > 2) {
-      const [type, target, fn] = args
-      const callback = function(e) {
-        const handle = fn.call(view, scope)
-        return isFunction(handle) ? handle.call(this, e) : null
-      }
-      bind('mount', () => {
-        const $container = getMountNode()
-        $container.on(type, target, callback)
-      })
-      bind('unmount', () => {
-        unbind(args)
-      })
-      callbacks.push([fn, callback])
-    }
+
+    const $container = getMountNode()
+    const action = once ? 'one' : 'on'
+
+    $container[action](...params, callback)
+    callbacks.push([fn, callback])
   }
 
   function unbind(args) {
-    if (args.length === 2) {
-      const [type, fn] = args
-      callbacks.forEach((item, i) => {
-        if (fn !== item[0]) {
-          return
-        }
-
-        const callback = item[1]
-        etx.off(type, callback)
-        callbacks.splice(i, 1)
-      })
+    if (args.length === 1) {
+      const $container = getMountNode()
+      $container.off(...args)
+      return
     }
-    else if (args.length > 2) {
-      const [type, target, fn] = args
-      callbacks.forEach((item, i) => {
-        if (fn !== item[0]) {
-          return
-        }
 
-        const callback = item[1]
-        const $container = getMountNode()
+    const params = [...args]
+    const fn = params.pop()
+    callbacks.forEach((item, i) => {
+      if (fn !== item[0]) {
+        return
+      }
 
-        $container.off(type, target, callback)
-        callbacks.splice(i, 1)
-      })
-    }
+      const callback = item[1]
+      const $container = getMountNode()
+
+      $container.off(...params, callback)
+      callbacks.splice(i, 1)
+    })
   }
 
   return view
@@ -431,6 +411,7 @@ directive('jq-repeat', function(el, attrs) {
 // --------------------------------
 
 class ViewModel extends TraceModel {}
+class View {}
 
 $.fn.vm = vm
 $.vm = {
@@ -439,6 +420,7 @@ $.vm = {
   ViewModel,
   Meta,
   Store,
+  View,
 }
 
 export { vm }

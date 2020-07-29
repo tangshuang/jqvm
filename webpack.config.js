@@ -9,6 +9,11 @@ const bundle = {
     library: 'jqvm',
     libraryTarget: 'umd',
   },
+  resolve: {
+    alias: {
+      'ts-fns$': 'ts-fns/es',
+    },
+  },
   externals: {
     jquery: {
       root: 'jQuery',
