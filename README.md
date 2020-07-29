@@ -87,6 +87,7 @@ The return value is a `view` object which has methods:
 - off(events, selector?, callback): unbind listener which is bound by `on`
 - mount(el?): mount view into DOM
 - unmount(): destroy view in DOM, `vm` is unusable until you invoke `mount` again
+- update(): rerender
 
 The `mount` method can receive a selector or a jquery element.
 
@@ -122,10 +123,11 @@ function callback(vm) {
 view.on('click', '.some', callback)
 ```
 
-When you do not pass `selector`, it is different from jQuery.fn.on, this way bind listener to inside events:
+Inside events:
 
-- mount: when you invoke `view.mount()` this event will be triggered
-- unmount: when you invoke `view.unmount()`
+- $mount: when you invoke `view.mount()` this event will be triggered
+- $unmount: when you invoke `view.unmount()`
+- $update: when invoke `view.update()`
 
 ```js
 $('#app')

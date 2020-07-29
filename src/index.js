@@ -90,32 +90,7 @@ function vm(initState) {
   let isMounted = false
 
   const callbacks = []
-
   const view = new View()
-  Object.assign(view, {
-    once(...args) {
-      bind(args, true)
-      return view
-    },
-    on(...args) {
-      bind(args)
-      return view
-    },
-    off(...args) {
-      unbind(...args)
-      return view
-    },
-    mount(el) {
-      init()
-      mount(el)
-      return view
-    },
-    unmount() {
-      unmount()
-      destroy()
-      return view
-    },
-  })
 
   function init() {
     if (isFunction(initState)) {
@@ -193,7 +168,8 @@ function vm(initState) {
       return view
     }
 
-    const $next = $this.next(container)
+    init()
+
     let $container = null
 
     mountTo = el || null // cache mount node
@@ -203,8 +179,8 @@ function vm(initState) {
       $container = $(el)
       $container.attr('jq-vm', hash)
     }
-    else if ($next.length) {
-      return
+    else if ($this.next(container).length) {
+      return view
     }
     else {
       $container = $('<div />', {
@@ -214,8 +190,14 @@ function vm(initState) {
     }
 
     render()
-    store.watch('*', render, true)
+
+    if (isFunction(store.watch)) {
+      store.watch('*', render, true)
+    }
+
     $container.trigger('$mount')
+
+    return view
   }
 
   function unmount() {
@@ -230,7 +212,10 @@ function vm(initState) {
     }
 
     $container.trigger('$unmount')
-    store.unwatch('*', render)
+
+    if (isFunction(store.unwatch)) {
+      store.unwatch('*', render)
+    }
 
     if (mountTo) {
       $container.html('')
@@ -241,6 +226,23 @@ function vm(initState) {
     }
     mountTo = null
     isMounted = false
+
+    destroy()
+
+    return view
+  }
+
+  function update() {
+    if (!isMounted) {
+      return view
+    }
+
+    render()
+
+    const $container = getMountNode()
+    $container.trigger('$update')
+
+    return view
   }
 
   function bind(args, once) {
@@ -280,6 +282,23 @@ function vm(initState) {
     })
   }
 
+  Object.assign(view, {
+    once(...args) {
+      bind(args, true)
+      return view
+    },
+    on(...args) {
+      bind(args)
+      return view
+    },
+    off(...args) {
+      unbind(...args)
+      return view
+    },
+    mount,
+    unmount,
+    update,
+  })
   return view
 }
 
