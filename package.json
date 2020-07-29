@@ -1,6 +1,6 @@
 {
   "name": "jqvm",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Reactive frontend framework based on jQuery.",
   "main": "dist/jqvm.js",
   "scripts": {
