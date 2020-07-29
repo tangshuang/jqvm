@@ -66,7 +66,7 @@ function vm(initState) {
     return mountTo ? $(mountTo) : $this.next(container)
   }
 
-  let store = null
+  let vm = null
   let state = null
   let scopex = null
 
@@ -82,17 +82,17 @@ function vm(initState) {
     }
 
     if (isInstanceOf(initState, ViewModel)) {
-      store = initState
-      state = store.state
+      vm = initState
+      state = vm.state
       scopex = new ScopeX(state)
     }
     else if (isObject(initState)) {
-      store = new ViewModel(initState)
-      state = store.state
+      vm = new ViewModel(initState)
+      state = vm.state
       scopex = new ScopeX(state)
     }
     else if (initState && typeof initState === 'object') {
-      store = initState
+      vm = initState
       state = initState
       scopex = new ScopeX(state)
     }
@@ -118,7 +118,7 @@ function vm(initState) {
   }
 
   function destroy() {
-    store = null
+    vm = null
     state = null
     scopex = null
     callbacks.length = 0
@@ -197,8 +197,8 @@ function vm(initState) {
 
     render()
 
-    if (typeof store.watch === 'function') {
-      store.watch('*', render, true)
+    if (typeof vm.watch === 'function') {
+      vm.watch('*', render, true)
     }
 
     $this.trigger('$mount')
@@ -221,8 +221,8 @@ function vm(initState) {
     $container.trigger('$unmount')
     $this.trigger('$unmount')
 
-    if (typeof store.unwatch === 'function') {
-      store.unwatch('*', render)
+    if (typeof vm.unwatch === 'function') {
+      vm.unwatch('*', render)
     }
 
     if (mountTo) {
