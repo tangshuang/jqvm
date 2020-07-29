@@ -12,7 +12,6 @@ const bundle = {
   resolve: {
     alias: {
       'ts-fns$': 'ts-fns/es',
-      'tyshemo$': 'tyshemo/src',
     },
   },
   externals: {

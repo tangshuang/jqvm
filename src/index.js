@@ -85,7 +85,7 @@ function vm(initState) {
   }
 
   let store = null
-  let scope = null
+  let state = null
   let scopex = null
 
   let mountTo = null
@@ -94,27 +94,29 @@ function vm(initState) {
   const callbacks = []
   const view = new View()
 
-  function init() {
+  function init(initState) {
     if (isFunction(initState)) {
       initState = initState()
     }
 
     if (isInstanceOf(initState, Store)) {
       store = initState
-      scope = store.state
-      scopex = new ScopeX(scope)
+      state = store.state
+      scopex = new ScopeX(state)
     }
     else if (isObject(initState)) {
       store = new Store(initState)
-      scope = store.state
-      scopex = new ScopeX(scope)
+      state = store.state
+      scopex = new ScopeX(state)
     }
-    else {
+    else if (initState && typeof initState === 'object') {
       store = initState
-      scope = initState
-      scopex = new ScopeX(scope)
+      state = initState
+      scopex = new ScopeX(state)
     }
+  }
 
+  function listen() {
     $this.on('$mount', () => {
       const $container = getMountNode()
       callbacks.forEach((item) => {
@@ -135,8 +137,9 @@ function vm(initState) {
 
   function destroy() {
     store = null
-    scope = null
+    state = null
     scopex = null
+    callbacks.length = 0
   }
 
   function render() {
@@ -191,7 +194,7 @@ function vm(initState) {
       return view
     }
 
-    init()
+    init(initState)
 
     let $container = null
 
@@ -247,7 +250,6 @@ function vm(initState) {
       $container.remove()
     }
 
-    callbacks.length = 0
     mountTo = null
     isMounted = false
 
@@ -256,9 +258,17 @@ function vm(initState) {
     return view
   }
 
-  function update() {
+  function update(nextState) {
     if (!isMounted) {
       return view
+    }
+
+    if (isFunction(nextState)) {
+      nextState = nextState(state)
+    }
+
+    if (isObject(nextState)) {
+      Object.assign(state, nextState)
     }
 
     render()
@@ -273,7 +283,7 @@ function vm(initState) {
     const info = [...args]
     const fn = info.pop()
     const callback = function(e) {
-      const handle = fn.call(view, scope)
+      const handle = fn.call(view, state)
       return isFunction(handle) ? handle.call(this, e) : null
     }
     const action = once ? 'one' : 'on'
@@ -326,6 +336,9 @@ function vm(initState) {
     update,
     find,
   })
+
+  listen()
+
   return view
 }
 

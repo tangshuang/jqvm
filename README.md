@@ -87,7 +87,8 @@ The return value is a `view` object which has methods:
 - off(events, selector?, callback): unbind listener which is bound by `on`
 - mount(el?): mount view into DOM
 - unmount(): destroy view in DOM, `vm` is unusable until you invoke `mount` again
-- update(): rerender
+- update(nextState): rerender
+- find(selector): same as `$.fn.find`, select elements in view container
 
 The `mount` method can receive a selector or a jquery element.
 
@@ -108,8 +109,7 @@ Now, let look into `callback` detail.
 
 ```js
 // a function which return a inner function
-// vm is the core `vm` object
-function callback(vm) {
+function callback(state) {
   const view = this // view.unmount()
 
   // handle function is used to be put into jQuery.fn.on as you did in `$('#app').on('click', handle)
@@ -132,19 +132,19 @@ Inside events:
 ```js
 $('#app')
   .vm({ name: 'some' })
-  .on('mount', vm => {
-    vm.name = 'new name'
+  .on('mount', state => {
+    state.name = 'new name'
   })
   .mount()
 ```
 
-The `vm` object you receive in callback function is a reactive object which is like vue's vm. So you can change properties of it directly to trigger rerendering.
-And the scope in template is `vm`, so when you write a `{{title}}` in template, you are calling `vm.title` in fact.
-`vm` is only available in `on` callback function.
+The `state` object you receive in callback function is a reactive object which is like vue's state. So you can change properties of it directly to trigger rerendering.
+And the scope in template is `state`, so when you write a `{{title}}` in template, you are calling `state.title` in fact.
+`state` is only available in `on` callback function.
 
 It is from `initState` which is received by `$('#app').vm(initState)`, It can be:
 
-- object: a normal object which is used to be initialize vm's backend state.
+- object: a normal object which is used to be initialize vm's state.
 - store: an instance of `Store`
 - function: which returns one of above or other objects
 
@@ -171,6 +171,9 @@ const store = new Store({
 })
 $('#app')
   .vm(store)
+  .on('click', 'button', state => (e) => {
+    state.name = 'new name'
+  })
   .mount()
 ```
 
@@ -235,10 +238,10 @@ class Person extends ViewModel {
 
 $('#app')
   .vm(new Person()) // shared vm, or .vm(() => new Person()) as indenpendent vm
-  .on('click', '.grow', vm => () => vm.grow())
-  .on('study', '.study', vm => (e) => {
+  .on('click', '.grow', model => () => model.grow())
+  .on('study', '.study', model => (e) => {
     const book = {}
-    vm.study(book)
+    model.study(book)
   })
   .mount()
 ```
