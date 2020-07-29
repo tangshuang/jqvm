@@ -1,11 +1,11 @@
-<h1 align="center"><img src="jqvm.png" alt="jqvm" width="120" height="120"/></h1>
+<h1 align="center"><a href="https://github.com/tangshuang/jqvm"><img src="jqvm.png" alt="jqvm" width="120" height="120"/></a></h1>
 <p align="center">The world's easiest reactive frontend view-model framework based on jQuery.</p>
 
 <br />
 <br />
 <br />
 
-<p align="center"><img src="https://camo.githubusercontent.com/3b69fdf3e874a6cc64012c5a1a858767155a95d9/687474703a2f2f72616e646f6a732e636f6d2f696d616765732f64726f70536861646f772e706e67" width="100%"/></p>
+<p align="center"><a href="https://github.com/tangshuang/jqvm"><img src="https://camo.githubusercontent.com/3b69fdf3e874a6cc64012c5a1a858767155a95d9/687474703a2f2f72616e646f6a732e636f6d2f696d616765732f64726f70536861646f772e706e67" width="100%"/></a></p>
 
 <br />
 <br />
