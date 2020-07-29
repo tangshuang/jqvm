@@ -51,6 +51,13 @@
       <section>
         <football color="#dd2311"></football>
       </section>
+
+      <section>
+        <div jq-hash="keep">
+          {{keep}}
+          <button data-change-by-hash>change keep</button>
+        </div>
+      </section>
     </template>
 
     <div id="model"></div>
@@ -77,6 +84,7 @@
             { name: 'bbb' },
             { name: 'ccc' },
           ],
+          keep: 0,
         })
         .on('click', '.toggle', vm => () => vm.show = !vm.show)
         .on('keyup', '[data-title-input]', vm => function(e) {
@@ -93,6 +101,9 @@
         .on('change', '[name=radio]', vm => function(e) {
           const value = e.target.value
           vm.radio = value
+        })
+        .on('click', '[data-change-by-hash]', vm => {
+          vm.keep ++
         })
         .mount()
 

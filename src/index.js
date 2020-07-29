@@ -137,16 +137,23 @@ function vm(initState) {
 
     $retainers.each(function() {
       const $retainer = $(this)
-      const $container = $(container)
+      const $container = getMountNode()
       const hash = $retainer.attr('jq-hash')
 
       const $target = $container.find(`[jq-hash=${hash}]`)
       if ($target.length) {
-        const attrs = createAttrs($target[0].attributes)
+        const target = $target[0]
+        const attrs = createAttrs(target.attributes)
+        const childNodes = target.childNodes
+
         $retainer.attr(attrs)
-        if ($retainer.is('textarea')) {
-          $retainer.text($target.text())
+        if (childNodes.length) {
+          $retainer.html(childNodes)
         }
+        else {
+          $retainer.html($target.html())
+        }
+
         $target.replaceWith($retainer)
       }
     })
