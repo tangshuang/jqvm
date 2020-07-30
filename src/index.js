@@ -191,6 +191,10 @@ function vm(initState) {
       $container = $(el)
       $container.attr('jq-vm', hash)
     }
+    // like $('<template>aaa</template>').vm(...)
+    else if (!$(document).find($this).length) {
+      throw new Error('el should must be passed by view.mount')
+    }
     else {
       $container = $('<div />', {
         'jq-vm': hash,
