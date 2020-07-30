@@ -104,8 +104,8 @@ function vm(initState) {
     $this.on('$mount', () => {
       const $container = getMountNode()
       actions.forEach((item) => {
-        const { action, info, action } = item
-        $container[action](...info, action)
+        const { type, info, action } = item
+        $container[type](...info, action)
       })
     })
 
@@ -276,9 +276,9 @@ function vm(initState) {
       const handle = fn.call(view, state)
       return isFunction(handle) ? handle.call(this, e) : null
     }
-    const action = once ? 'one' : 'on'
+    const type = once ? 'one' : 'on'
 
-    actions.push({ action, info, fn, action })
+    actions.push({ type, info, fn, action })
   }
 
   function unbind(args) {
