@@ -75,7 +75,7 @@ Unlike vue.js, you should must bind event listeners in script, not in template.
 </script>
 ```
 
-Here, you call the `on` method and pass a callback function to change `state`, and the view will be rerendered.
+Here, you call the `on` method and pass a action function to change `state`, and the view will be rerendered.
 
 ## :tada: API
 
@@ -100,8 +100,8 @@ JQVM will treat html in #app as template, so, it is recommended to use `template
 
 The return value is a `view` object which has methods:
 
-- on(events, selector?, callback): bind listeners, notice that callback is different from jQuery.fn.on, I will detail later
-- off(events, selector?, callback): unbind listener which is bound by `on`
+- on(events, selector?, action): bind listeners, notice that action function is different from jQuery.fn.on callback function, I will detail later
+- off(events, selector?, action): unbind listener which is bound by `on`
 - mount(el?): mount view into DOM
 - unmount(): destroy view in DOM, `vm` is unusable until you invoke `mount` again
 - update(nextState): rerender, you can pass new state into `update()`, the new state will be merge into old state like react setState does.
@@ -122,22 +122,22 @@ $(template)
 
 When selector is passed into `mount`, the view will be rendered in the target element (replace with innerHTML). If selector is not passed, you should select a element in DOM and the view will be rendered after the selected element (as the beginning code does).
 
-Now, let's look into `callback` detail.
+Now, let's look into `action` detail.
 
 ```js
 // a function which return a inner function
-function callback(state) {
+function action(state) {
   const view = this // view.unmount()
 
   // handle function which is put into jQuery.fn.on as you did like `$('#app').on('click', handle)`
-  // handle function is optional, when you do not return handle function, callback will be invoked when the event happens, but you have no idea to receive DOM event
+  // handle function is optional, when you do not return handle function, action will still be invoked when the event happens, but you have no idea to receive DOM event
   return function handle(e) {
     const el = this
     const $el = $(this)
   }
 }
 
-view.on('click', '.some', callback)
+view.on('click', '.some', action)
 ```
 
 Inside events:
@@ -155,9 +155,9 @@ $('#app')
   .mount()
 ```
 
-The `state` object you receive in callback function is a reactive object which is like what vue does. So you can change properties of it directly to trigger rerendering.
+The `state` object you receive in action function is a reactive object which is like what vue does. So you can change properties of it directly to trigger rerendering.
 And the scope in template is `state`, so when you write a `{{title}}` syntax in template, you are calling `state.title` in fact.
-`state` is only available in `on` callback functions.
+`state` is only available in `on` action functions.
 
 It is created from `initState` which is received by `$('#app').vm(initState)`, `innitState` can be one of:
 
@@ -220,7 +220,7 @@ This make vm independent, it will create one new `vm` in each mounting.
 
 First at all, you should read [tyshemo](https://tyshemo.js.org) to know how to use `Model`.
 
-To use a Model, you can provide more information in `on` callback.
+To use a Model, you can provide more information in `on` action.
 
 ```js
 import { Model, Meta } from 'tyshemo'

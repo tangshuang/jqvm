@@ -75,7 +75,7 @@ function vm(initState) {
   let mountTo = null
   let isMounted = false
 
-  const callbacks = []
+  const actions = []
   const view = new View()
 
   function init(initState) {
@@ -103,18 +103,18 @@ function vm(initState) {
   function listen() {
     $this.on('$mount', () => {
       const $container = getMountNode()
-      callbacks.forEach((item) => {
-        const { action, info, callback } = item
-        $container[action](...info, callback)
+      actions.forEach((item) => {
+        const { action, info, action } = item
+        $container[action](...info, action)
       })
     })
 
     $this.on('$unmount', () => {
       const $container = getMountNode()
-      callbacks.forEach((item, i) => {
-        const { info, callback } = item
-        $container.off(...info, callback)
-        callbacks.splice(i, 1)
+      actions.forEach((item, i) => {
+        const { info, action } = item
+        $container.off(...info, action)
+        actions.splice(i, 1)
       })
     })
   }
@@ -123,7 +123,7 @@ function vm(initState) {
     vm = null
     state = null
     scopex = null
-    callbacks.length = 0
+    actions.length = 0
   }
 
   function render() {
@@ -268,13 +268,13 @@ function vm(initState) {
   function bind(args, once) {
     const info = [...args]
     const fn = info.pop()
-    const callback = function(e) {
+    const action = function(e) {
       const handle = fn.call(view, state)
       return isFunction(handle) ? handle.call(this, e) : null
     }
     const action = once ? 'one' : 'on'
 
-    callbacks.push({ action, info, fn, callback })
+    actions.push({ action, info, fn, action })
   }
 
   function unbind(args) {
@@ -288,14 +288,14 @@ function vm(initState) {
     const fn = info.pop()
     const $container = getMountNode()
 
-    callbacks.forEach((item, i) => {
-      const { info, callback } = item
+    actions.forEach((item, i) => {
+      const { info, action } = item
       if (fn !== item.fn) {
         return
       }
 
-      $container.off(...info, callback)
-      callbacks.splice(i, 1)
+      $container.off(...info, action)
+      actions.splice(i, 1)
     })
   }
 
