@@ -86,7 +86,7 @@
           ],
           keep: 0,
         })
-        .on('click', '.toggle', vm => () => vm.show = !vm.show)
+        .on('click', '.toggle', vm => vm.show = !vm.show)
         .on('keyup', '[data-title-input]', vm => function(e) {
           const value = e.target.value
           vm.title = value
@@ -95,10 +95,10 @@
           const value = e.target.value
           vm.text = value
         })
-        .on('change', '[data-checkbox]', vm => function(e) {
+        .on('change', '[data-checkbox]', vm => {
           vm.checked = !vm.checked
         })
-        .on('change', '[name=radio]', vm => function(e) {
+        .on('change', '[name=radio]', vm => {
           const value = e.target.value
           vm.radio = value
         })

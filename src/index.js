@@ -6,14 +6,19 @@ import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction } from 
 import { getOuterHTML, tryParseJSON, createAttrs } from './utils.js'
 
 const components = {}
-const directives = {}
+const directives = []
 
 function component(name, link) {
   components[name] = link
 }
 
-function directive(attr, link) {
-  directives[attr] = link
+function directive(name, link) {
+  directives.forEach((item, i) => {
+    if (item[0] === name) {
+      directives.splice(i, 1)
+    }
+  })
+  directives.push([name, link])
 }
 
 // ----------- compiler ---------------
@@ -28,10 +33,8 @@ const createIterator = (link, scopex) => function iterate() {
 }
 
 const compileDirectives = ($wrapper, scopex) => {
-  const attrs = Object.keys(directives)
-  attrs.forEach((attr) => {
-    const link = directives[attr]
-    const $els = $wrapper.find(`[${attr}]`)
+  directives.forEach(([name, link]) => {
+    const $els = $wrapper.find(`[${name}]`)
     $els.each(createIterator(link, scopex))
   })
 }
@@ -327,10 +330,37 @@ function vm(initState) {
 
 // register inside directives
 
-directive('jq-id', function(el, attrs) {
-  const attr = attrs['jq-id']
-  const value = this.interpolate(attr)
-  attrs['jq-id'] = value
+directive('jq-repeat', function(el, attrs) {
+  const attr = attrs['jq-repeat']
+  const repeatScope = attrs['repeat-scope'] || '{}'
+  const repeatKey = attrs['repeat-key'] || 'key'
+  const repeatValue = attrs['repeat-value'] || 'value'
+
+  const data = this.parse(attr)
+  const scope = this.parse(repeatScope)
+
+  // make it not be able to compile again
+  el.removeAttr('jq-repeat')
+  el.attr('x-jq-repeat', attr)
+
+  const template = el[0].outerHTML
+  const els = []
+
+  each(data, (value, key) => {
+    const scopex = new ScopeX({
+      [repeatKey]: key,
+      [repeatValue]: value,
+      ...scope,
+    })
+
+    const html = compile(template, scopex)
+    const result = scopex.interpolate(html)
+    els.push(result)
+  })
+
+  const result = els.join('')
+  const output = result.replace(/x\-jq\-repeat/g, 'jq-repeat')
+  el.replaceWith(output)
 })
 
 directive('jq-if', function(el, attrs) {
@@ -339,14 +369,25 @@ directive('jq-if', function(el, attrs) {
   return value ? el : ''
 })
 
+directive('jq-id', function(el, attrs) {
+  const attr = attrs['jq-id']
+  const value = this.interpolate(attr)
+  attrs['jq-id'] = value
+})
+
 directive('jq-class', function(el, attrs) {
+  const hash = attrs['jq-hash'] || getStringHash(getOuterHTML(el[0]))
+
   const attr = attrs['jq-class']
   const obj = this.parse(attr)
+
   each(obj, (value ,key) => {
     if (value) {
       el.addClass(key)
     }
   })
+
+  el.attr('jq-hash', hash)
 })
 
 directive('jq-value', function(el, attrs) {
@@ -405,41 +446,8 @@ directive('jq-src', function(el, attrs) {
   const attr = attrs['jq-src']
   const value = this.parse(attr)
 
-  el.attr('jq-hash', hash)
   el.attr('src', value)
-})
-
-directive('jq-repeat', function(el, attrs) {
-  const attr = attrs['jq-repeat']
-  const repeatScope = attrs['repeat-scope'] || '{}'
-  const repeatKey = attrs['repeat-key'] || 'key'
-  const repeatValue = attrs['repeat-value'] || 'value'
-
-  const data = this.parse(attr)
-  const scope = this.parse(repeatScope)
-
-  // make it not be able to compile again
-  el.removeAttr('jq-repeat')
-  el.attr('x-jq-repeat', attr)
-
-  const template = el[0].outerHTML
-  const els = []
-
-  each(data, (value, key) => {
-    const scopex = new ScopeX({
-      [repeatKey]: key,
-      [repeatValue]: value,
-      ...scope,
-    })
-
-    const html = compile(template, scopex)
-    const result = scopex.interpolate(html)
-    els.push(result)
-  })
-
-  const result = els.join('')
-  const output = result.replace(/x\-jq\-repeat/g, 'jq-repeat')
-  el.replaceWith(output)
+  el.attr('jq-hash', hash)
 })
 
 // --------------------------------
@@ -454,5 +462,4 @@ $.vm = {
   View,
 }
 
-export { vm, component, directive, ViewModel, View }
-export default vm
+export { component, directive, ViewModel, View }
