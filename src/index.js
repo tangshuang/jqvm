@@ -64,7 +64,6 @@ function vm(initState) {
   const el = $this[0]
   const hash = getStringHash(getOuterHTML(el))
   const container = `[jq-vm=${hash}]`
-  const template = $this.html()
   const getMountNode = () => {
     return mountTo ? $(mountTo) : $this.next(container)
   }
@@ -135,6 +134,7 @@ function vm(initState) {
     const activeStart = active.selectionStart
     const activeEnd = active.selectionEnd
 
+    const template = $this.html()
     const result = compile(template, scopex)
     $container.html(result)
 
