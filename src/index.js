@@ -170,7 +170,7 @@ function vm(initState) {
       }
     }
 
-    $container.trigger('$update')
+    $container.trigger('$render')
   }
 
   function mount(el) {
@@ -204,13 +204,12 @@ function vm(initState) {
       $this.after($container)
     }
 
-    render()
-
     if (typeof vm.watch === 'function') {
       vm.watch('*', render, true)
       vm.watch('*', (...args) => $container.trigger('$change', ...args), true)
     }
 
+    render()
     $this.trigger('$mount')
     $container.trigger('$mount')
 

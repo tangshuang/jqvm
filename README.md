@@ -144,7 +144,8 @@ Inside events:
 
 - $mount: when you invoke `view.mount()` this event will be triggered
 - $unmount: when you invoke `view.unmount()`
-- $update: when invoke `view.update()`
+- $render: when inner content rendered
+- $change: when state change
 
 ```js
 $('#app')
