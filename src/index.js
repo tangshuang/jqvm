@@ -169,6 +169,8 @@ function vm(initState) {
         active.setSelectionRange(activeStart, activeEnd)
       }
     }
+
+    $container.trigger('$update')
   }
 
   function mount(el) {
@@ -206,6 +208,7 @@ function vm(initState) {
 
     if (typeof vm.watch === 'function') {
       vm.watch('*', render, true)
+      vm.watch('*', (...args) => $container.trigger('$change', ...args), true)
     }
 
     $this.trigger('$mount')
@@ -262,9 +265,6 @@ function vm(initState) {
     }
 
     render()
-
-    const $container = getMountNode()
-    $container.trigger('$update')
 
     return view
   }
