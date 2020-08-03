@@ -100,10 +100,11 @@ JQVM will treat html in #app as template, so, it is recommended to use `template
 
 The return value is a `view` object which has methods:
 
-- on(events, selector?, action): bind listeners, notice that action function is different from jQuery.fn.on callback function, I will detail later
-- off(events, selector?, action): unbind listener which is bound by `on`
+- on(events, selector?, action): bind an action, notice that action function is different from jQuery.fn.on callback function, I will detail later
+- off(events, selector?, action?): unbind listener which is bound by `on`
 - mount(el?): mount view into DOM
-- unmount(): destroy view in DOM, `vm` is unusable until you invoke `mount` again
+- unmount(): unmount view from DOM, `vm` is unusable until you invoke `mount` again
+- destroy(): unmount and clear bound actions, after you destroy, you can mount again, but actions should be bound again
 - update(nextState): rerender, you can pass new state into `update()`, the new state will be merge into old state like react setState does.
 - find(selector): same as `$.fn.find`, select elements in view container
 

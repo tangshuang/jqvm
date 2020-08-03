@@ -119,13 +119,6 @@ function vm(initState) {
     })
   }
 
-  function destroy() {
-    vm = null
-    state = null
-    scopex = null
-    actions.length = 0
-  }
-
   function render() {
     const $container = getMountNode()
     const $retainers = $container.find('[jq-hash]')
@@ -245,9 +238,16 @@ function vm(initState) {
     mountTo = null
     isMounted = false
 
-    destroy()
-
     return view
+  }
+
+  function destroy() {
+    unmount()
+
+    vm = null
+    state = null
+    scopex = null
+    actions.length = 0
   }
 
   function update(nextState) {
@@ -322,6 +322,7 @@ function vm(initState) {
     },
     mount,
     unmount,
+    destroy,
     update,
     find,
   })
