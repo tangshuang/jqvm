@@ -1,11 +1,11 @@
 import ViewModel from 'tyshemo/src/store'
 import ScopeX from 'scopex'
-import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction } from 'ts-fns'
+import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction, isString } from 'ts-fns'
 
 import { getOuterHTML, tryParseJSON, createAttrs } from './utils.js'
 
 let $ = null
-
+class View {}
 const components = {}
 const directives = []
 
@@ -131,6 +131,31 @@ function vm(initState) {
     const template = $this.html()
     const result = compile(template, scopex)
     $container.html(result)
+
+    const attrs = $this.attr('attrs')
+    if (attrs) {
+      const props = new ScopeX(null).parse(attrs)
+      each(props, (value, key) => {
+        if (key === 'class') {
+          const items = value.split(' ')
+          items.forEach(item => $container.addClass(item))
+        }
+        else if (key === 'style') {
+          if (isObject(value)) {
+            $container.css(value)
+          }
+          else if (isString(value)) {
+            const style = $container.attr('style') || ''
+            const rules = style.split(';').concat(value.split(';')).filter(item => !!item)
+            const stylesheet = rules.join(';')
+            $container.attr('style', stylesheet)
+          }
+        }
+        else {
+          $container.attr(key, value)
+        }
+      })
+    }
 
     $retainers.each(function() {
       const $retainer = $(this)
@@ -456,8 +481,6 @@ directive('jq-src', function(el, attrs) {
 })
 
 // --------------------------------
-
-class View {}
 
 function useJQuery(jQuery) {
   $ = jQuery
