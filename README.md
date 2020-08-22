@@ -22,6 +22,15 @@ JQvm is a library, a jQuery plugin, a frontend reactive view-model framework, wh
 npm i jqvm
 ```
 
+With modules system.
+
+```js
+import jQuery from 'jquery'
+import { useJQuery } from 'jqvm'
+
+const $ = useJQuery(jQuery)
+```
+
 You can use cdn of unpkg.
 
 ```html
@@ -58,6 +67,18 @@ You should create scripts like this:
     .vm({ title: 'Default Title' })
     .mount()
 </script>
+```
+
+Or
+
+```js
+import jQuery from 'jquery'
+import { useJQuery } from 'jqvm'
+
+const $ = useJQuery(jQuery)
+$('#app')
+  .vm({ title: 'Default Title' })
+  .mount()
 ```
 
 **step 3: bind event listeners**

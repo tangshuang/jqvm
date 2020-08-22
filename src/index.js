@@ -1,9 +1,10 @@
-import $ from 'jquery'
 import ViewModel from 'tyshemo/src/store'
 import ScopeX from 'scopex'
 import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction } from 'ts-fns'
 
 import { getOuterHTML, tryParseJSON, createAttrs } from './utils.js'
+
+let $ = null
 
 const components = {}
 const directives = []
@@ -458,12 +459,21 @@ directive('jq-src', function(el, attrs) {
 
 class View {}
 
-$.fn.vm = vm
-$.vm = {
-  component,
-  directive,
-  ViewModel,
-  View,
+function useJQuery(jQuery) {
+  $ = jQuery
+  $.fn.vm = vm
+  $.vm = {
+    component,
+    directive,
+    ViewModel,
+    View,
+  }
+  return $
 }
 
-export { component, directive, ViewModel, View }
+// use in browser
+if (typeof jQuery !== 'undefined') {
+  useJQuery(jQuery)
+}
+
+export { component, directive, ViewModel, View, useJQuery }
