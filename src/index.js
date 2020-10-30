@@ -125,8 +125,8 @@ function vm(initState) {
     const $retainers = $container.find('[jq-hash]')
 
     const active = document.activeElement
-    const activeStart = active.selectionStart
-    const activeEnd = active.selectionEnd
+    const activeStart = active ? active.selectionStart : 0
+    const activeEnd = active ? active.selectionEnd : 0
 
     const template = $this.html()
     const result = compile(template, scopex)
@@ -180,12 +180,15 @@ function vm(initState) {
       }
     })
 
-    const $active = $(active)
-    const hash = $active.attr('jq-hash')
-    if (hash) {
-      active.focus()
-      if (activeStart) {
-        active.setSelectionRange(activeStart, activeEnd)
+    // recover active form elements
+    if (active) {
+      const $active = $(active)
+      const hash = $active.attr('jq-hash')
+      if (hash) {
+        active.focus()
+        if (activeStart) {
+          active.setSelectionRange(activeStart, activeEnd)
+        }
       }
     }
 
