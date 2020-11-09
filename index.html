@@ -104,11 +104,11 @@
           range: 0,
         })
         .on('click', '.toggle', vm => vm.show = !vm.show)
-        .on('keyup', '[data-title-input]', vm => function(e) {
+        .on('input', '[data-title-input]', vm => function(e) {
           const value = e.target.value
           vm.title = value
         })
-        .on('keyup', '[data-text-input]', vm => function(e) {
+        .on('input', '[data-text-input]', vm => function(e) {
           const value = e.target.value
           vm.text = value
         })
