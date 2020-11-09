@@ -104,8 +104,9 @@ Here, you call the `on` method and pass a action function to change `state`, and
 
 `$.vm` is a set of jqvm static services. It contains:
 
-- component(name, link): component register function
-- directive(name, link): directive register function
+- component(name, link): global component register function
+- directive(name, link): global directive register function
+- filter(name, formatter): global filter register function
 - ViewModel: vm constructor
 - View: view constructor
 
@@ -128,6 +129,9 @@ The return value is a `view` object which has methods:
 - destroy(): unmount and clear bound actions, after you destroy, you can mount again, but actions should be bound again
 - update(nextState): rerender, you can pass new state into `update()`, the new state will be merge into old state like react setState does.
 - find(selector): same as `$.fn.find`, select elements in view container
+- component: register component only for this vm
+- directive: register directive only for this vm
+- filter: register formatter only for this vm
 
 The `mount` method can receive a selector or a jquery element.
 
@@ -368,6 +372,26 @@ The `jq-repeat` usage is a little complex:
 ```
 
 You can use `repeat-key` `repeat-value` `repeat-scope` together with `jq-repeat`.
+
+## :bread: Filter
+
+A filter is a string formatter which used in template.
+
+```html
+<template>
+  <div>{{ price | number:2 }}</div>
+</template>
+```
+
+```js
+function number(value, fixed) {
+  return value.toFixed(fixed)
+}
+
+view.filter('number', number)
+```
+
+The first paramter of the function is the value receive from the previous before `|`.
 
 ## :see_no_evil: License
 
