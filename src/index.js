@@ -1,98 +1,172 @@
 import ViewModel from 'tyshemo/src/store'
 import ScopeX from 'scopex'
-import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction, isString, diffArray } from 'ts-fns'
+import { isNone, each, isInstanceOf, isObject, isFunction, isString, diffArray, uniqueArray } from 'ts-fns'
 
-import { getOuterHTML, tryParseJSON, createAttrs } from './utils.js'
+import { createAttrs } from './utils.js'
 
+let vmId = 0
 let $ = null
-class View {}
-const globalComponents = {}
-const globalDirectives = []
 
-function component(name, link) {
-  globalComponents[name] = link
+class View {}
+
+// ---------------
+
+const globalComponents = []
+const globalDirectives = []
+const globalFilters = {}
+
+function component(name, compile, affect) {
+  globalComponents.forEach((item, i) => {
+    if (item[0] === name) {
+      globalComponents.splice(i, 1)
+    }
+  })
+  globalComponents.push([name, compile, affect])
 }
 
-function directive(name, link) {
+function directive(name, compile, affect) {
   globalDirectives.forEach((item, i) => {
     if (item[0] === name) {
       globalDirectives.splice(i, 1)
     }
   })
-  globalDirectives.push([name, link])
+  globalDirectives.push([name, compile, affect])
+}
+
+function filter(name, fn) {
+  globalFilters[name] = fn
 }
 
 // ----------- compiler ---------------
 
-const createIterator = (link, scopex) => function iterate() {
-  const $el = $(this)
-  const attrs = createAttrs(this.attributes)
-  const output = link.call(scopex, $el, attrs)
-  if (!isNone(output) && $el !== output) {
-    $el.replaceWith(output)
+const compile = (template, scope, components, directives) => {
+  const createIterator = (fn, scope) => function iterate() {
+    if (typeof fn !== 'function') {
+      return
+    }
+    const $el = $(this)
+    const attrs = createAttrs(this.attributes)
+    const output = fn.call({ scope, components, directives }, $el, attrs)
+    if (!isNone(output) && $el !== output) {
+      $el.replaceWith(output)
+    }
   }
-}
 
-const compileDirectives = ($wrapper, scopex, directives) => {
-  directives.forEach(([name, link]) => {
-    const $els = $wrapper.find(`[${name}]`)
-    $els.each(createIterator(link, scopex))
-  })
-}
+  const compileDirectives = ($element, scope, directives) => {
+    directives.forEach(([name, compile]) => {
+      const $els = $element.find(`[${name}]`)
+      $els.each(createIterator(compile, scope))
+    })
+  }
 
-const compileComponents = ($wrapper, scopex, components) => {
-  const names = Object.keys(components)
-  names.forEach((name) => {
-    const link = components[name]
-    const $els = $wrapper.find(name)
-    $els.each(createIterator(link, scopex))
-  })
-}
+  const compileComponents = ($element, scope, components) => {
+    components.forEach(([name, compile]) => {
+      const $els = $element.find(name)
+      $els.each(createIterator(compile, scope))
+    })
+  }
 
-function compile(template, scopex, components, directives) {
-  const $wrapper = $('<div />').html(template)
-  compileDirectives($wrapper, scopex, directives)
-  compileComponents($wrapper, scopex, components)
-  const innerHTML = $wrapper.html()
-  const result = scopex.interpolate(innerHTML)
+  const $element = $('<div />').html(template)
+  compileDirectives($element, scope, directives)
+  compileComponents($element, scope, components)
+  const innerHTML = $element.html()
+  const result = scope.interpolate(innerHTML)
   return result
+}
+
+const affect = ($element, scope, components, directives) => {
+  const createIterator = (fn, scope, push) => function iterate() {
+    if (typeof fn !== 'function') {
+      return
+    }
+    const $el = $(this)
+    const attrs = createAttrs(this.attributes)
+    const revoke = fn.call({ scope, components, directives }, $el, attrs)
+    if (typeof revoke === 'function') {
+      push(revoke)
+    }
+  }
+
+  const runIterator = ($els, item, scope) => {
+    const [name, compile, affect] = item
+
+    // revoke effects
+    if (item.revokers && item.revokers.length) {
+      item.revokers.forEach((revoke) => revoke())
+    }
+
+    const revokers = item.revokers = []
+    const push = (revoke) => {
+      revokers.push(revoke)
+    }
+
+    $els.each(createIterator(affect, scope, push))
+  }
+
+  const affectDirectives = ($element, scope, directives) => {
+    directives.forEach((item) => {
+      const [name] = item
+      const $els = $element.find(`[${name}]`)
+      runIterator($els, item, scope)
+    })
+  }
+
+  const affectComponents = ($element, scope, components) => {
+    components.forEach((item) => {
+      const [name] = item
+      const $els = $element.find(name)
+      runIterator($els, item, scope)
+    })
+  }
+
+  affectDirectives($element, scope, directives)
+  affectComponents($element, scope, components)
 }
 
 // ---------------- main ---------------
 
 function vm(initState) {
-  const $this = $(this)
-  const el = $this[0]
-  const hash = getStringHash(getOuterHTML(el))
+  const $template = $(this)
+  const hash = $template.attr('id') || $template.attr('jq-vm-id') || (vmId ++, vmId)
   const container = `[jq-vm=${hash}]`
   const getMountNode = () => {
-    return mountTo ? $(mountTo) : $this.next(container)
+    return mountTo ? $(mountTo) : $template.next(container)
   }
 
   let vm = null
   let state = null
-  let scopex = null
+  let scope = null
 
   let mountTo = null
   let isMounted = false
 
-  const components = { ...globalComponents }
-  const directives = { ...globalDirectives }
   const actions = []
   const view = new View()
-  
-  function component(name, link) {
-    components[name] = link
+
+  // -----------
+
+  const components = Array.from(globalComponents, component => [...component])
+  const directives = Array.from(globalDirectives, directive => [...directive])
+  const filters = { ...globalFilters }
+
+  function component(name, affect) {
+    components[name] = affect
   }
 
-  function directive(name, link) {
+  function directive(name, affect) {
     directives.forEach((item, i) => {
       if (item[0] === name) {
         directives.splice(i, 1)
       }
     })
-    directives.push([name, link])
+    directives.push([name, affect])
   }
+
+  function filter(name, fn) {
+    filters[name] = fn
+  }
+
+  // ------------
 
   function init(initState) {
     if (isFunction(initState)) {
@@ -102,22 +176,24 @@ function vm(initState) {
     if (isInstanceOf(initState, ViewModel)) {
       vm = initState
       state = vm.state
-      scopex = new ScopeX(state)
+      scope = new ScopeX(state)
     }
     else if (isObject(initState)) {
       vm = new ViewModel(initState)
       state = vm.state
-      scopex = new ScopeX(state)
+      scope = new ScopeX(state)
     }
     else if (initState && typeof initState === 'object') {
       vm = initState
       state = initState
-      scopex = new ScopeX(state)
+      scope = new ScopeX(state)
     }
+
+    scope.filters = filters
   }
 
   function listen() {
-    $this.on('$mount', () => {
+    $template.on('$mount', () => {
       const $container = getMountNode()
       actions.forEach((item) => {
         const { type, info, action } = item
@@ -125,7 +201,7 @@ function vm(initState) {
       })
     })
 
-    $this.on('$unmount', () => {
+    $template.on('$unmount', () => {
       const $container = getMountNode()
       actions.forEach((item, i) => {
         const { info, action } = item
@@ -135,21 +211,24 @@ function vm(initState) {
     })
   }
 
-  function render() {
+  function render(update) {
     const $container = getMountNode()
-    const $retainers = $container.find('[jq-hash]')
 
-    const active = document.activeElement
-    const activeStart = active ? active.selectionStart : 0
-    const activeEnd = active ? active.selectionEnd : 0
+    const template = $template.html()
+    const html = compile(template, scope, components, directives)
 
-    const template = $this.html()
-    const result = compile(template, scopex, components, directives)
-    diffAndPatch($container, result)
+    if (update) {
+      diffAndPatch($container, $('<div />').html(html), true)
+    }
+    else {
+      $container.html(html)
+    }
 
-    const attrs = $this.attr('attrs')
+    affect($container, scope, components, directives)
+
+    const attrs = $template.attr('attrs')
     if (attrs) {
-      const props = scopex.parse(attrs)
+      const props = scope.parse(attrs)
       each(props, (value, key) => {
         if (key === 'class') {
           const items = value.split(' ')
@@ -162,7 +241,7 @@ function vm(initState) {
           else if (isString(value)) {
             const style = $container.attr('style') || ''
             const rules = style.split(';').concat(value.split(';')).filter(item => !!item)
-            const stylesheet = rules.join(';')
+            const stylesheet = uniqueArray(rules).join(';')
             $container.attr('style', stylesheet)
           }
         }
@@ -172,104 +251,115 @@ function vm(initState) {
       })
     }
 
-    $retainers.each(function() {
-      const $retainer = $(this)
-      const $container = getMountNode()
-      const hash = $retainer.attr('jq-hash')
-
-      const $target = $container.find(`[jq-hash=${hash}]`)
-      if ($target.length) {
-        const target = $target[0]
-        const attrs = createAttrs(target.attributes)
-        const childNodes = target.childNodes
-
-        $retainer.attr(attrs)
-        if (childNodes.length) {
-          $retainer.html(childNodes)
-        }
-        else {
-          $retainer.html($target.html())
-        }
-
-        $target.replaceWith($retainer)
-      }
-    })
-
-    // recover active form elements
-    if (active) {
-      const $active = $(active)
-      const hash = $active.attr('jq-hash')
-      if (hash) {
-        active.focus()
-        if (activeStart) {
-          active.setSelectionRange(activeStart, activeEnd)
-        }
-      }
-    }
-
     $container.trigger('$render')
   }
-  
-  function diffAndPatch($container, nextHtml) {
-    const $next = $(nextHtml)
-    
-    const container = $container[0]
+
+  function diffAndPatch($current, $next, top) {
+    const current = $current[0]
     const next = $next[0]
-    
-    const containerAtrrs = creatAttrs(container)
-    const nextAttrs = creatAttrs(next)
-    
-    const containerAttrNames = Object.keys(containerAttrs)
+
+    const currentAttrs = createAttrs(current.attributes)
+    const nextAttrs = createAttrs(next.attributes)
+
+    const currentAttrNames = Object.keys(currentAttrs)
     const nextAttrNames = Object.keys(nextAttrs)
-    
+
+    // update/add attrs
     nextAttrNames.forEach((name) => {
-      const containerValue = containerAttrs[name]
+      const currentValue = currentAttrs[name]
       const nextValue = nextAttrs[name]
-      
-      if (containerValue !== nextValue) {
-        $container.attr(name, nextValue)
+
+      if (currentValue !== nextValue) {
+        $current.attr(name, nextValue)
       }
     })
-    
-    const diffAttrNames = diffArray(containerAtrrNames, nextAttrNames)
-    diffAttrNames.forEach((name) => {
-      $container.removeAttr(name)
-    })
-    
-    const containerChildren = [...container.childNodes]
+
+    // remove no use attrs
+    if (!top) {
+      const diffAttrNames = diffArray(currentAttrNames, nextAttrNames)
+      diffAttrNames.forEach((name) => {
+        // keep style and class attributes
+        if (name === 'style' || name === 'class') {
+          return
+        }
+        $current.removeAttr(name)
+      })
+    }
+
+    const currentChildren = [...current.childNodes]
     const nextChildren = [...next.childNodes]
-    
-    if (!containerChildren.length) {
+
+    // append all children at once if current is empty inside
+    if (!currentChildren.length) {
       nextChildren.forEach((child) => {
-        container.appendChild(child)
+        current.appendChild(child)
       })
       return
     }
-    
-    let cursor = 0
-    
-    nextChildren.forEach((nextChild) => {
-      const containerChild = containerChildren[cursor]
-      if (nextChild.nodeName !== containerChild.nodeName) {
-        container.insertBefore(nextChild, containerChild)
+
+    /**
+     * diff and patch children
+     */
+
+    const $parent = $current
+    const parentNode = current
+    nextChildren.forEach((next, i) => {
+      const $next = $(next)
+      const current = parentNode.childNodes[i]
+      const $current = $(current)
+
+      // move exist element
+      const nextId = $next.attr('jq-id')
+      if (nextId) {
+        const $prev = $parent.find(`[jq-id=${nextId}]`)
+        if ($prev.length) {
+          const prev = $prev[0]
+          // move it
+          parentNode.insertBefore(prev, current)
+          // update the node
+          diffAndPatch($prev, $next)
+        }
+        else {
+          parentNode.insertBefore(next, current)
+        }
       }
+
+      // insert coming child directly
+      else if (next.nodeName !== current.nodeName) {
+        parentNode.insertBefore(next, current)
+      }
+
+      // diff and patch element
+      else if (next.nodeName !== '#text') {
+        diffAndPatch($current, $next)
+      }
+
+      // diff and patch text
       else {
-        diffAndPatch($())
-        cursor ++
+        if (next.textContent !== current.textContent) {
+          current.textContent = next.textContent
+        }
       }
     })
+
+    // remove no use elements
+    for (let i = nextChildren.length, len = current.childNodes.length; i < len; i ++) {
+      const child = current.childNodes[i]
+      current.removeChild(child)
+    }
   }
 
   function change(...args) {
+    const $container = getMountNode()
     $container.trigger('$change', ...args)
   }
-  
+
   function mount(el) {
     if (isMounted) {
       return view
     }
 
-    if ($this.next(container).length) {
+    if ($template.next(container).length) {
       return view
     }
 
@@ -285,14 +375,14 @@ function vm(initState) {
       $container.attr('jq-vm', hash)
     }
     // like $('<template>aaa</template>').vm(...)
-    else if (!$(document).find($this).length) {
+    else if (!$(document).find($template).length) {
       throw new Error('el should must be passed by view.mount')
     }
     else {
       $container = $('<div />', {
         'jq-vm': hash,
       })
-      $this.after($container)
+      $template.after($container)
     }
 
     if (typeof vm.watch === 'function') {
@@ -301,7 +391,7 @@ function vm(initState) {
     }
 
     render()
-    $this.trigger('$mount')
+    $template.trigger('$mount')
     $container.trigger('$mount')
 
     return view
@@ -319,7 +409,7 @@ function vm(initState) {
     }
 
     $container.trigger('$unmount')
-    $this.trigger('$unmount')
+    $template.trigger('$unmount')
 
     if (typeof vm.unwatch === 'function') {
       vm.unwatch('*', render)
@@ -345,7 +435,7 @@ function vm(initState) {
 
     vm = null
     state = null
-    scopex = null
+    scope = null
     actions.length = 0
   }
 
@@ -362,7 +452,7 @@ function vm(initState) {
       Object.assign(state, nextState)
     }
 
-    render()
+    render(true)
 
     return view
   }
@@ -426,6 +516,7 @@ function vm(initState) {
     find,
     component,
     directive,
+    filter,
   })
 
   listen()
@@ -435,124 +526,120 @@ function vm(initState) {
 
 // register inside directives
 
-directive('jq-repeat', function(el, attrs) {
+directive('jq-repeat', function($el, attrs) {
   const attr = attrs['jq-repeat']
-  const repeatScope = attrs['repeat-scope'] || '{}'
-  const repeatKey = attrs['repeat-key'] || 'key'
-  const repeatValue = attrs['repeat-value'] || 'value'
 
-  const data = this.parse(attr)
-  const scope = this.parse(repeatScope)
+  if (!/^[a-z][a-zA-Z0-9_$]*(,[a-z][a-zA-Z0-9_$]*){0,1} in [a-z][a-zA-Z0-9_$]+ traceby [a-z][a-zA-Z0-9_$.]*/.test(attr)) {
+    throw new Error('jq-repeat should match formatter `value,key in data traceby id`!')
+  }
+
+  const [kv, , dataKey, , traceBy] = attr.split(' ')
+  const [valueName, keyName] = kv.split(',')
+
+  const { scope, components, directives } = this
+  const data = scope.parse(dataKey)
 
   // make it not be able to compile again
-  el.removeAttr('jq-repeat')
-  el.attr('x-jq-repeat', attr)
+  $el.removeAttr('jq-repeat')
+  $el.attr('x-jq-repeat', attr)
 
-  const template = el[0].outerHTML
-  const els = []
+  const template = $el[0].outerHTML
+  const $els = []
 
   each(data, (value, key) => {
-    const scopex = new ScopeX({
-      [repeatKey]: key,
-      [repeatValue]: value,
-      ...scope,
+    const scope = this.scope.$new({
+      [keyName]: key,
+      [valueName]: value,
     })
 
-    const html = compile(template, scopex)
-    const result = scopex.interpolate(html)
-    els.push(result)
+
+    const result = compile(template, scope, components, directives)
+    const html = scope.interpolate(result)
+    const $item = $(html)
+
+    $item.removeAttr('x-jq-repeat')
+    $item.attr('jq-repeat', attr)
+    if (traceBy) {
+      const traceId = scope.parse(traceBy)
+      $item.attr('jq-id', traceId)
+    }
+
+    $els.push($item)
   })
 
-  const result = els.join('')
-  const output = result.replace(/x\-jq\-repeat/gm, 'jq-repeat')
-  el.replaceWith(output)
+  $el.replaceWith($els)
 })
 
-directive('jq-if', function(el, attrs) {
+directive('jq-if', function($el, attrs) {
   const attr = attrs['jq-if']
-  const value = tryParseJSON(attr, (attr) => this.parse(attr))
-  return value ? el : ''
+  const value = this.scope.parse(attr)
+  return value ? $el : ''
 })
 
-directive('jq-id', function(el, attrs) {
+directive('jq-id', function($el, attrs) {
   const attr = attrs['jq-id']
-  const value = this.interpolate(attr)
-  attrs['jq-id'] = value
+  const value = this.scope.interpolate(attr)
+  $el.attr('jq-id', value)
 })
 
-directive('jq-class', function(el, attrs) {
-  const hash = attrs['jq-hash'] || getStringHash(getOuterHTML(el[0]))
-
+directive('jq-class', function($el, attrs) {
   const attr = attrs['jq-class']
-  const obj = this.parse(attr)
-
+  const obj = this.scope.parse(attr)
   each(obj, (value ,key) => {
     if (value) {
-      el.addClass(key)
+      $el.addClass(key)
     }
   })
-
-  el.attr('jq-hash', hash)
 })
 
-directive('jq-value', function(el, attrs) {
-  const hash = attrs['jq-hash'] || getStringHash(getOuterHTML(el[0]))
+directive(
+  'jq-value',
+  function($el, attrs) {
+    const attr = attrs['jq-value']
+    const value = this.scope.parse(attr)
 
-  const attr = attrs['jq-value']
-  const value = this.parse(attr)
+    if ($el.is('select')) {
+      if (value) {
+        const option = $el.find(`option[value=${value}]`)
+        option.attr('selected', 'selected')
+      }
+    }
+    else if ($el.is('input')) {
+      $el.attr('value', value)
+    }
+    else if ($el.is('textarea')) {
+      $el.text(value)
+    }
+  },
+  function($el, attrs) {
+    const attr = attrs['jq-value']
+    const value = this.scope.parse(attr)
+    $el.val(value)
+  },
+)
 
-  if (el.is('select')) {
-    const option = el.find(`option[value=${value}]`)
-    option.attr('selected', 'selected')
-  }
-  else if (el.is('input')) {
-    el.attr('value', value)
-  }
-  else if (el.is('textarea')) {
-    el.text(value)
-  }
-
-  el.attr('jq-hash', hash)
-})
-
-directive('jq-disabled', function(el, attrs) {
-  const hash = attrs['jq-hash'] || getStringHash(getOuterHTML(el[0]))
-
+directive('jq-disabled', null, function($el, attrs) {
   const attr = attrs['jq-disabled']
-  const value = this.parse(attr)
-
-  el.attr('disabled', value ? 'disabled' : null)
-  el.attr('jq-hash', hash)
+  const value = this.scope.parse(attr)
+  $el.prop('disabled', value)
 })
 
-directive('jq-checked', function(el, attrs) {
-  const hash = attrs['jq-hash'] || getStringHash(getOuterHTML(el[0]))
-
+directive('jq-checked', null, function($el, attrs) {
   const attr = attrs['jq-checked']
-  const value = this.parse(attr)
-
-  el.attr('checked', value ? 'checked' : null)
-  el.attr('jq-hash', hash)
+  const value = this.scope.parse(attr)
+  $el.prop('checked', value)
 })
 
-directive('jq-selected', function(el, attrs) {
-  const hash = attrs['jq-hash'] || getStringHash(getOuterHTML(el[0]))
-
+directive('jq-selected', null, function($el, attrs) {
   const attr = attrs['jq-selected']
-  const value = this.parse(attr)
-
-  el.attr('selected', value ? 'selected' : null)
-  el.attr('jq-hash', hash)
+  const value = this.scope.parse(attr)
+  $el.prop('selected', value)
 })
 
-directive('jq-src', function(el, attrs) {
-  const hash = attrs['jq-hash'] || getStringHash(getOuterHTML(el[0]))
-
+directive('jq-src', null, function($el, attrs) {
   const attr = attrs['jq-src']
-  const value = this.parse(attr)
-
-  el.attr('src', value)
-  el.attr('jq-hash', hash)
+  const value = this.scope.parse(attr)
+  $el.attr('src', value)
 })
 
 // --------------------------------
@@ -563,6 +650,7 @@ function useJQuery(jQuery) {
   $.vm = {
     component,
     directive,
+    filter,
     ViewModel,
     View,
   }
@@ -574,4 +662,4 @@ if (typeof jQuery !== 'undefined') {
   useJQuery(jQuery)
 }
 
-export { component, directive, ViewModel, View, useJQuery }
+export { component, directive, filter, ViewModel, View, useJQuery }
