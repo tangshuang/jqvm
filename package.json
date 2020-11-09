@@ -24,9 +24,9 @@
   "license": "MIT",
   "dependencies": {
     "jquery": "^3.5.1",
-    "scopex": "^1.1.1",
+    "scopex": "^1.2.2",
     "ts-fns": "^7.2.6",
-    "tyshemo": "^9.0.37"
+    "tyshemo": "^9.1.3"
   },
   "devDependencies": {
     "webpack": "^4.44.0",

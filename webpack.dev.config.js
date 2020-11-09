@@ -1,6 +1,7 @@
 const [bundle, min] = require('./webpack.config.js')
 module.exports = {
-  ...min,
+  ...bundle,
+  mode: 'none',
   devServer: {
     contentBase: __dirname,
     port: 8099,

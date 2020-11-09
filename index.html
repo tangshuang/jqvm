@@ -37,6 +37,7 @@
           </label>
         </div>
         <div>
+          select: {{radio}}
           <label>
             <input type="radio" jq-checked="radio === 'a'" value="a" data-radio name="radio">
             A
@@ -46,10 +47,20 @@
             B
           </label>
         </div>
+        <div>
+          select: {{select}}
+          <select jq-value="select" data-select>
+            <option jq-repeat="item in items traceby item.name" value="{{item.name}}">{{item.name}}</option>
+          </select>
+        </div>
+        <div>
+          range: {{range}}
+          <input type="range" jq-value="range" data-range />
+        </div>
       </section>
 
       <section>
-        <div jq-repeat="items" repeat-value="item">{{item.name}}</div>
+        <div jq-repeat="item,index in items traceby item.name">{{item.name}}</div>
       </section>
 
       <section>
@@ -68,7 +79,7 @@
 
     <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
     <script src="https://unpkg.com/tyshemo/dist/tyshemo.min.js"></script>
-    <script src="dist/jqvm.min.js"></script>
+    <script src="dist/jqvm.js"></script>
 
     <script>
       $.vm.component('football', function($el, attrs) {
@@ -83,12 +94,14 @@
           text: 'This is a long text, \nwhich has break wrodk',
           checked: false,
           radio: 'a',
+          select: '',
           items: [
             { name: 'aaa' },
             { name: 'bbb' },
             { name: 'ccc' },
           ],
           keep: 0,
+          range: 0,
         })
         .on('click', '.toggle', vm => vm.show = !vm.show)
         .on('keyup', '[data-title-input]', vm => function(e) {
@@ -102,23 +115,31 @@
         .on('change', '[data-checkbox]', vm => {
           vm.checked = !vm.checked
         })
-        .on('change', '[name=radio]', vm => {
+        .on('change', '[name=radio]', vm => function(e) {
           const value = e.target.value
           vm.radio = value
+        })
+        .on('change', '[data-select]', vm => function(e) {
+          const value = e.target.value
+          vm.select = value
+        })
+        .on('input', '[data-range]', vm => function(e) {
+          const value = e.target.value
+          vm.range = value
         })
         .on('click', '[data-change-by-hash]', vm => {
           vm.keep ++
         })
         .mount()
 
-      const { Model } = window.tyshemo
+      const { Model, Meta } = window.tyshemo
       class Person extends Model {
-        static name = {
+        static name = new Meta({
           default: '',
-        }
-        static age = {
+        })
+        static age = new Meta({
           default: 0,
-        }
+        })
       }
 
       const template = `

@@ -23,13 +23,13 @@ export function getAttrs(el) {
 }
 
 export function createAttrs(attributes) {
-	const oAttrs = Array.from(attributes)
+  const oAttrs = Array.from(attributes)
   const attrs = {}
   oAttrs.forEach((node) => {
     const { name, value } = node
     attrs[name] = value
-	})
-	return attrs
+  })
+  return attrs
 }
 
 export function tryParseJSON(v, callback) {
