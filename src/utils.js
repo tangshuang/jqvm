@@ -15,6 +15,13 @@ export function getOuterHTML(el) {
   return str
 }
 
+export function getAttrs(el) {
+  return [...el.attributes].map(item => ({
+    name: item.name,
+    value: item.value,
+  }))
+}
+
 export function createAttrs(attributes) {
 	const oAttrs = Array.from(attributes)
   const attrs = {}

@@ -1,25 +1,25 @@
 import ViewModel from 'tyshemo/src/store'
 import ScopeX from 'scopex'
-import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction, isString } from 'ts-fns'
+import { getStringHash, isNone, each, isInstanceOf, isObject, isFunction, isString, diffArray } from 'ts-fns'
 
 import { getOuterHTML, tryParseJSON, createAttrs } from './utils.js'
 
 let $ = null
 class View {}
-const components = {}
-const directives = []
+const globalComponents = {}
+const globalDirectives = []
 
 function component(name, link) {
-  components[name] = link
+  globalComponents[name] = link
 }
 
 function directive(name, link) {
-  directives.forEach((item, i) => {
+  globalDirectives.forEach((item, i) => {
     if (item[0] === name) {
-      directives.splice(i, 1)
+      globalDirectives.splice(i, 1)
     }
   })
-  directives.push([name, link])
+  globalDirectives.push([name, link])
 }
 
 // ----------- compiler ---------------
@@ -33,14 +33,14 @@ const createIterator = (link, scopex) => function iterate() {
   }
 }
 
-const compileDirectives = ($wrapper, scopex) => {
+const compileDirectives = ($wrapper, scopex, directives) => {
   directives.forEach(([name, link]) => {
     const $els = $wrapper.find(`[${name}]`)
     $els.each(createIterator(link, scopex))
   })
 }
 
-const compileComponents = ($wrapper, scopex) => {
+const compileComponents = ($wrapper, scopex, components) => {
   const names = Object.keys(components)
   names.forEach((name) => {
     const link = components[name]
@@ -49,10 +49,10 @@ const compileComponents = ($wrapper, scopex) => {
   })
 }
 
-function compile(template, scopex) {
+function compile(template, scopex, components, directives) {
   const $wrapper = $('<div />').html(template)
-  compileDirectives($wrapper, scopex)
-  compileComponents($wrapper, scopex)
+  compileDirectives($wrapper, scopex, directives)
+  compileComponents($wrapper, scopex, components)
   const innerHTML = $wrapper.html()
   const result = scopex.interpolate(innerHTML)
   return result
@@ -76,8 +76,23 @@ function vm(initState) {
   let mountTo = null
   let isMounted = false
 
+  const components = { ...globalComponents }
+  const directives = { ...globalDirectives }
   const actions = []
   const view = new View()
+  
+  function component(name, link) {
+    components[name] = link
+  }
+
+  function directive(name, link) {
+    directives.forEach((item, i) => {
+      if (item[0] === name) {
+        directives.splice(i, 1)
+      }
+    })
+    directives.push([name, link])
+  }
 
   function init(initState) {
     if (isFunction(initState)) {
@@ -129,12 +144,12 @@ function vm(initState) {
     const activeEnd = active ? active.selectionEnd : 0
 
     const template = $this.html()
-    const result = compile(template, scopex)
-    $container.html(result)
+    const result = compile(template, scopex, components, directives)
+    diffAndPatch($container, result)
 
     const attrs = $this.attr('attrs')
     if (attrs) {
-      const props = new ScopeX(null).parse(attrs)
+      const props = scopex.parse(attrs)
       each(props, (value, key) => {
         if (key === 'class') {
           const items = value.split(' ')
@@ -194,7 +209,61 @@ function vm(initState) {
 
     $container.trigger('$render')
   }
+  
+  function diffAndPatch($container, nextHtml) {
+    const $next = $(nextHtml)
+    
+    const container = $container[0]
+    const next = $next[0]
+    
+    const containerAtrrs = creatAttrs(container)
+    const nextAttrs = creatAttrs(next)
+    
+    const containerAttrNames = Object.keys(containerAttrs)
+    const nextAttrNames = Object.keys(nextAttrs)
+    
+    nextAttrNames.forEach((name) => {
+      const containerValue = containerAttrs[name]
+      const nextValue = nextAttrs[name]
+      
+      if (containerValue !== nextValue) {
+        $container.attr(name, nextValue)
+      }
+    })
+    
+    const diffAttrNames = diffArray(containerAtrrNames, nextAttrNames)
+    diffAttrNames.forEach((name) => {
+      $container.removeAttr(name)
+    })
+    
+    const containerChildren = [...container.childNodes]
+    const nextChildren = [...next.childNodes]
+    
+    if (!containerChildren.length) {
+      nextChildren.forEach((child) => {
+        container.appendChild(child)
+      })
+      return
+    }
+    
+    let cursor = 0
+    
+    nextChildren.forEach((nextChild) => {
+      const containerChild = containerChildren[cursor]
+      if (nextChild.nodeName !== containerChild.nodeName) {
+        container.insertBefore(nextChild, containerChild)
+      }
+      else {
+        diffAndPatch($())
+        cursor ++
+      }
+    })
+  }
 
+  function change(...args) {
+    $container.trigger('$change', ...args)
+  }
+  
   function mount(el) {
     if (isMounted) {
       return view
@@ -228,7 +297,7 @@ function vm(initState) {
 
     if (typeof vm.watch === 'function') {
       vm.watch('*', render, true)
-      vm.watch('*', (...args) => $container.trigger('$change', ...args), true)
+      vm.watch('*', change, true)
     }
 
     render()
@@ -254,6 +323,7 @@ function vm(initState) {
 
     if (typeof vm.unwatch === 'function') {
       vm.unwatch('*', render)
+      vm.unwatch('*', change)
     }
 
     if (mountTo) {
@@ -354,6 +424,8 @@ function vm(initState) {
     destroy,
     update,
     find,
+    component,
+    directive,
   })
 
   listen()
@@ -392,7 +464,7 @@ directive('jq-repeat', function(el, attrs) {
   })
 
   const result = els.join('')
-  const output = result.replace(/x\-jq\-repeat/g, 'jq-repeat')
+  const output = result.replace(/x\-jq\-repeat/gm, 'jq-repeat')
   el.replaceWith(output)
 })
 
