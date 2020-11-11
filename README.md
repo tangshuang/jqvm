@@ -360,18 +360,14 @@ Here are builtin directives:
 The `jq-repeat` usage is a little complex:
 
 ```html
-<div jq-repeat="data" repeat-value="item" repeat-key="index" repeat-scope="{
-  some: some,
-  any: any
-}">
+<div jq-repeat="value,index in data traceby value.id">
   <span>{{index + 1}}</span>
-  <span>{{item.name}}</span>
-  <span>{{some.time}}</span>
-  <span>{{any.num}}</span>
+  <span>{{value.name}}</span>
+  <span>{{value.time}}</span>
 </div>
 ```
 
-You can use `repeat-key` `repeat-value` `repeat-scope` together with `jq-repeat`.
+Notice, `value,index` should have NO space inside, `,index` is optional.
 
 ## :bread: Filter
 
