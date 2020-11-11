@@ -40,88 +40,84 @@ function filter(name, fn) {
 // ----------- compiler ---------------
 
 const compile = (template, scope, components, directives) => {
-  const createIterator = (fn, scope) => function iterate() {
+  const createIterator = (fn) => function iterate() {
     if (typeof fn !== 'function') {
       return
     }
     const $el = $(this)
     const attrs = createAttrs(this.attributes)
-    const output = fn.call({ scope, components, directives }, $el, attrs)
+    // developers can recompile inside fn
+    const output = fn.call({ scope, components, directives, compile }, $el, attrs)
     if (!isNone(output) && $el !== output) {
       $el.replaceWith(output)
     }
   }
 
-  const compileDirectives = ($element, scope, directives) => {
-    directives.forEach(([name, compile]) => {
-      const $els = $element.find(`[${name}]`)
-      $els.each(createIterator(compile, scope))
-    })
-  }
-
-  const compileComponents = ($element, scope, components) => {
-    components.forEach(([name, compile]) => {
-      const $els = $element.find(name)
-      $els.each(createIterator(compile, scope))
-    })
-  }
-
   const $element = $('<div />').html(template)
-  compileDirectives($element, scope, directives)
-  compileComponents($element, scope, components)
+
+  directives.forEach(([name, compile]) => {
+    const $els = $element.find(`[${name}]`)
+    $els.each(createIterator(compile))
+  })
+
+  components.forEach(([name, compile]) => {
+    const $els = $element.find(name)
+    $els.each(createIterator(compile))
+  })
+
   const innerHTML = $element.html()
   const result = scope.interpolate(innerHTML)
   return result
 }
 
 const affect = ($element, scope, components, directives) => {
-  const createIterator = (fn, scope, push) => function iterate() {
-    if (typeof fn !== 'function') {
+  const element = $element[0]
+  const revokers = element.jQvmSideEffectsRevokers = element.jQvmSideEffectsRevokers || []
+
+  const createIterator = (affect) => function iterate() {
+    if (typeof affect !== 'function') {
       return
     }
     const $el = $(this)
     const attrs = createAttrs(this.attributes)
-    const revoke = fn.call({ scope, components, directives }, $el, attrs)
+    const revoke = affect.call({ scope }, $el, attrs)
     if (typeof revoke === 'function') {
-      push(revoke)
-    }
-  }
-
-  const runIterator = ($els, item, scope) => {
-    const [name, compile, affect] = item
-
-    // revoke effects
-    if (item.revokers && item.revokers.length) {
-      item.revokers.forEach((revoke) => revoke())
-    }
-
-    const revokers = item.revokers = []
-    const push = (revoke) => {
       revokers.push(revoke)
     }
-
-    $els.each(createIterator(affect, scope, push))
   }
 
-  const affectDirectives = ($element, scope, directives) => {
-    directives.forEach((item) => {
-      const [name] = item
-      const $els = $element.find(`[${name}]`)
-      runIterator($els, item, scope)
-    })
+  const runIterator = ($els, item) => {
+    const [name, compile, affect] = item
+    $els.each(createIterator(affect))
   }
 
-  const affectComponents = ($element, scope, components) => {
-    components.forEach((item) => {
-      const [name] = item
-      const $els = $element.find(name)
-      runIterator($els, item, scope)
-    })
-  }
+  directives.forEach((item) => {
+    const [name] = item
+    const $els = $element.find(`[${name}]`)
+    runIterator($els, item)
+  })
 
-  affectDirectives($element, scope, directives)
-  affectComponents($element, scope, components)
+  components.forEach((item) => {
+    const [name] = item
+    const $els = $element.find(name)
+    runIterator($els, item)
+  })
 }
+
+const removeEffect = ($element) => {
+  const element = $element[0]
+  const revokers = element.jQvmSideEffectsRevokers = element.jQvmSideEffectsRevokers || []
+
+  if (!revokers.length) {
+    return
+  }
+
+  revokers.forEach((revoke) => {
+    revoke()
+  })
+  revokers.length = 0 // clear revokers
+}
+
 
 // ---------------- main ---------------
 
@@ -214,10 +210,12 @@ function vm(initState) {
   function render(update) {
     const $container = getMountNode()
 
+    removeEffect($container, scope)
+
     const template = $template.html()
     const html = compile(template, scope, components, directives)
 
-    if (update) {
+    if (!!update) {
       diffAndPatch($container, $('<div />').html(html), true)
     }
     else {
@@ -551,7 +549,6 @@ directive('jq-repeat', function($el, attrs) {
       [keyName]: key,
       [valueName]: value,
     })
-
 
     const result = compile(template, scope, components, directives)
     const html = scope.interpolate(result)

@@ -104,8 +104,8 @@ Here, you call the `on` method and pass a action function to change `state`, and
 
 `$.vm` is a set of jqvm static services. It contains:
 
-- component(name, link): global component register function
-- directive(name, link): global directive register function
+- component(name, compile, affect): global component register function
+- directive(name, compile, affect): global directive register function
 - filter(name, formatter): global filter register function
 - ViewModel: vm constructor
 - View: view constructor
@@ -129,9 +129,9 @@ The return value is a `view` object which has methods:
 - destroy(): unmount and clear bound actions, after you destroy, you can mount again, but actions should be bound again
 - update(nextState): rerender, you can pass new state into `update()`, the new state will be merge into old state like react setState does.
 - find(selector): same as `$.fn.find`, select elements in view container
-- component: register component only for this vm
-- directive: register directive only for this vm
-- filter: register formatter only for this vm
+- component(name, compile, affect): register component only for this vm
+- directive(name, compile, affect): register directive only for this vm
+- filter(name, formatter): register formatter only for this vm
 
 The `mount` method can receive a selector or a jquery element.
 
@@ -298,32 +298,17 @@ $('#app')
 
 This is what you can do with `Model`.
 
-## :clown_face: Component
-
-You can invoke `component` to create a new tag.
-
-```js
-const { component } = $.vm
-
-component('icon', function(el, attrs) {
-  // notice the el is a copy from template
-  const { type } = attrs
-  // return new html to render
-  return `<i class="icon icon-${type}"></i>`
-})
-```
-
-Now you can use this `icon` component in template:
-
-```html
-<template id="app">
-  <icon type="search"></icon>
-</template>
-```
-
 ## :dizzy: Directive
 
 You can invoke `directive` to create a new attribute.
+
+```
+directive(name:string, compile:function, affect:function)
+```
+
+- name: the tag name of the directive
+- compile($el, attrs): how to compile this component, should return undefined|$el|htmlstring
+- affect($el, attrs): do some side effects after whole template have been compiled, should return a function to abolish side effects, will be invoke after each compilation
 
 ```js
 const { directive } = $.vm
@@ -343,6 +328,29 @@ directive('jq-link', function(el, attrs) {
 ```
 
 *Notice that, `el` is a copy element in `directive` and `component`, it is not in real DOM, so you should not bind events on it, binding will not work!*
+
+Example of `affect`:
+
+```js
+directive('jq-src', null, function($el, attrs) {
+  // here $el is real DOM element referer
+  const attr = attrs['jq-src']
+  const value = this.scope.parse(attr)
+  $el.attr('src', value)
+})
+```
+
+This is the source code of `jq-src`, by this operation, image will not be loaded when compiling, and will be loaded after insert into DOM.
+
+You can even bind event listeners to $el:
+
+```js
+directive('jq-on-click', null, function($el, attrs) {
+  const callback = () => console.log('click')
+  $el.on('click', callback)
+  return () => $el.off('click', callback) // notice, you should must return function to abolish side effects
+})
+```
 
 **BuiltIn Directives**
 
@@ -368,6 +376,37 @@ The `jq-repeat` usage is a little complex:
 ```
 
 Notice, `value,index` should have NO space inside, `,index` is optional.
+
+## :clown_face: Component
+
+You can invoke `component` to create a new tag.
+
+```
+component(name:string, compile:function, affect:function)
+```
+
+- name: the tag name of the component
+- compile($el, attrs): how to compile this component, should return undefined|$el|htmlstring
+- affect($el, attrs): do some side effects after whole template have been compiled, should return a function to abolish side effects, will be invoke after each compilation
+
+```js
+const { component } = $.vm
+
+component('icon', function(el, attrs) {
+  // notice the el is a copy from template
+  const { type } = attrs
+  // return new html to render
+  return `<i class="icon icon-${type}"></i>`
+})
+```
+
+Now you can use this `icon` component in template:
+
+```html
+<template id="app">
+  <icon type="search"></icon>
+</template>
+```
 
 ## :bread: Filter
 
