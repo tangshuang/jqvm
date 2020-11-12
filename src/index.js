@@ -618,6 +618,25 @@ directive('jq-selected', null, function($el, attrs) {
   $el.prop('selected', value)
 })
 
+directive(
+  'jq-bind',
+  null,
+  function($el, attrs) {
+    const attr = attrs['jq-bind']
+    const value = this.scope.parse(attr)
+    $el.val(value)
+
+    const callback = (e) => {
+      const value = e.target.value
+      this.scope.assign(attr, value)
+    }
+    const event = $el.is('input,textarea') ? 'input' : 'change'
+
+    $el.on(event, callback)
+    return () => $el.off(event, callback)
+  },
+)
+
 directive('jq-src', null, function($el, attrs) {
   const attr = attrs['jq-src']
   const value = this.scope.parse(attr)
