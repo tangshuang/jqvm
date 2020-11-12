@@ -606,19 +606,19 @@ directive('jq-value', null, function($el, attrs) {
 directive('jq-disabled', null, function($el, attrs) {
   const attr = attrs['jq-disabled']
   const value = this.scope.parse(attr)
-  $el.prop('disabled', value)
+  $el.prop('disabled', !!value)
 })
 
 directive('jq-checked', null, function($el, attrs) {
   const attr = attrs['jq-checked']
   const value = this.scope.parse(attr)
-  $el.prop('checked', value)
+  $el.prop('checked', !!value)
 })
 
 directive('jq-selected', null, function($el, attrs) {
   const attr = attrs['jq-selected']
   const value = this.scope.parse(attr)
-  $el.prop('selected', value)
+  $el.prop('selected', !!value)
 })
 
 directive(
@@ -627,13 +627,25 @@ directive(
   function($el, attrs) {
     const attr = attrs['jq-bind']
     const value = this.scope.parse(attr)
-    $el.val(value)
+
+    const event = $el.is('[type=checkbox],[type=radio],[type=color],[type=date],[type=datetime-local],[type=week],[type=file],select') ? 'change' : 'input'
+    const checkbox = $el.is('[type=checkbox]')
+    const radio = $el.is('[type=radio]')
+
+    if (checkbox) {
+      $el.prop('checked', !!value)
+    }
+    else if (radio) {
+      $el.prop('checked', value === $el.val())
+    }
+    else {
+      $el.val(value)
+    }
 
     const callback = (e) => {
-      const value = e.target.value
+      const value = checkbox ? $el.prop('checked') : e.target.value
       this.scope.assign(attr, value)
     }
-    const event = $el.is('input,textarea') ? 'input' : 'change'
 
     $el.on(event, callback)
     return () => $el.off(event, callback)
