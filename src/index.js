@@ -550,10 +550,13 @@ directive('jq-repeat', function($el, attrs) {
   const $els = []
 
   each(data, (value, key) => {
-    const scope = parentScope.$new({
-      [keyName]: key,
+    const newScope = {
       [valueName]: value,
-    })
+    }
+    if (keyName) {
+      newScope[keyName] = key
+    }
+    const scope = parentScope.$new(newScope)
 
     const result = compile({ template, scope })
     const html = scope.interpolate(result)
