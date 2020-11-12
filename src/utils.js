@@ -41,3 +41,30 @@ export function tryParseJSON(v, callback) {
     return callback(v)
   }
 }
+
+export function getPath($element, $root, prefix = []) {
+  let $parent = $element.parent()
+
+  const index = [...$parent.children()].findIndex(child => child === $element[0])
+  const name = $element[0].nodeName.toLowerCase()
+  const path = [`${name}:eq(${index})`]
+
+  let level = 0
+  while ($parent[0] !== $root[0]) {
+    const $element = $parent
+    $parent = $parent.parent()
+
+    const index = [...$parent.children()].findIndex(child => child === $element[0])
+    const name = $element[0].nodeName.toLowerCase()
+
+    path.unshift(`${name}:eq(${index})`)
+
+    level ++
+    if (level > 20) {
+      throw new Error('Cant get $element path in given $root.')
+    }
+  }
+
+  const items = [].concat(prefix).concat(path)
+  return items.join('>')
+}

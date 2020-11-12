@@ -2,7 +2,7 @@ import ViewModel from 'tyshemo/src/store'
 import ScopeX from 'scopex'
 import { isNone, each, isInstanceOf, isObject, isFunction, isString, diffArray, uniqueArray } from 'ts-fns'
 
-import { createAttrs } from './utils.js'
+import { createAttrs, getPath } from './utils.js'
 
 let vmId = 0
 let $ = null
@@ -39,30 +39,65 @@ function filter(name, fn) {
 
 // ----------- compiler ---------------
 
-const compile = (template, scope, components, directives) => {
-  const createIterator = (fn) => function iterate() {
-    if (typeof fn !== 'function') {
-      return
-    }
-    const $el = $(this)
-    const attrs = createAttrs(this.attributes)
-    // developers can recompile inside fn
-    const output = fn.call({ scope, components, directives, compile }, $el, attrs)
-    if (!isNone(output) && $el !== output) {
-      $el.replaceWith(output)
-    }
+const initCompile = ($root) => {
+  const root = $root[0]
+  const records = root.jQvmCompiledRecords = root.jQvmCompiledRecords || []
+
+  if (!records.length) {
+    return
   }
+
+  records.forEach((record) => {
+    // reset effects
+    if (record.revoke) {
+      record.revoke()
+    }
+  })
+
+  // clear
+  records.length = 0
+}
+
+const compile = (prefix = [], $root, components, directives, { template, scope }) => {
+  const root = $root[0]
+  const records = root.jQvmCompiledRecords = root.jQvmCompiledRecords || []
 
   const $element = $('<div />').html(template)
 
-  directives.forEach(([name, compile]) => {
-    const $els = $element.find(`[${name}]`)
-    $els.each(createIterator(compile))
+  const createIterator = (fn, affect) => function() {
+    const $el = $(this)
+    const attrs = createAttrs(this.attributes)
+    const parentPath = getPath($el.parent(), $element, prefix)
+
+    let selectors = []
+
+    if (typeof fn === 'function') {
+      // developers can recompile inside fn
+      const output = fn.call({
+        scope,
+        compile: compile.bind(null, parentPath, $root, components, directives),
+      }, $el, attrs)
+      if (!isNone(output) && $el !== output) {
+        const $newEls = $(output)
+        $el.replaceWith($newEls)
+        selectors = [...$newEls].map(el => getPath($(el), $element, prefix))
+      }
+    }
+    else {
+      selectors = [getPath($el, $element, prefix)]
+    }
+
+    records.push({ selectors, affect, attrs })
+  }
+
+  components.forEach(([name, compile, affect]) => {
+    const $els = $element.find(name)
+    $els.each(createIterator(compile, affect))
   })
 
-  components.forEach(([name, compile]) => {
-    const $els = $element.find(name)
-    $els.each(createIterator(compile))
+  directives.forEach(([name, compile, affect]) => {
+    const $els = $element.find(`[${name}]`)
+    $els.each(createIterator(compile, affect))
   })
 
   const innerHTML = $element.html()
@@ -70,63 +105,31 @@ const compile = (template, scope, components, directives) => {
   return result
 }
 
-const affect = ($element, scope, components, directives) => {
-  const element = $element[0]
-  const revokers = element.jQvmSideEffectsRevokers = element.jQvmSideEffectsRevokers || []
+const affect = ($root, scope) => {
+  const root = $root[0]
+  const records = root.jQvmCompiledRecords = root.jQvmCompiledRecords || []
 
-  const createIterator = (affect) => function iterate() {
+  records.forEach((record) => {
+    const { selectors, affect, attrs } = record
     if (typeof affect !== 'function') {
       return
     }
-    const $el = $(this)
-    const attrs = createAttrs(this.attributes)
-    const revoke = affect.call({ scope }, $el, attrs)
+    const $el = $root.find(selectors.join(','))
+    const revoke = affect.call({ $root, scope }, $el, attrs)
     if (typeof revoke === 'function') {
-      revokers.push(revoke)
+      record.revoke = revoke
     }
-  }
-
-  const runIterator = ($els, item) => {
-    const [name, compile, affect] = item
-    $els.each(createIterator(affect))
-  }
-
-  directives.forEach((item) => {
-    const [name] = item
-    const $els = $element.find(`[${name}]`)
-    runIterator($els, item)
-  })
-
-  components.forEach((item) => {
-    const [name] = item
-    const $els = $element.find(name)
-    runIterator($els, item)
   })
 }
-
-const removeEffect = ($element) => {
-  const element = $element[0]
-  const revokers = element.jQvmSideEffectsRevokers = element.jQvmSideEffectsRevokers || []
-
-  if (!revokers.length) {
-    return
-  }
-
-  revokers.forEach((revoke) => {
-    revoke()
-  })
-  revokers.length = 0 // clear revokers
-}
-
 
 // ---------------- main ---------------
 
 function vm(initState) {
   const $template = $(this)
   const hash = $template.attr('id') || $template.attr('jq-vm-id') || (vmId ++, vmId)
-  const container = `[jq-vm=${hash}]`
+  const root = `[jq-vm=${hash}]`
   const getMountNode = () => {
-    return mountTo ? $(mountTo) : $template.next(container)
+    return mountTo ? $(mountTo) : $template.next(root)
   }
 
   let vm = null
@@ -190,39 +193,39 @@ function vm(initState) {
 
   function listen() {
     $template.on('$mount', () => {
-      const $container = getMountNode()
+      const $root = getMountNode()
       actions.forEach((item) => {
         const { type, info, action } = item
-        $container[type](...info, action)
+        $root[type](...info, action)
       })
     })
 
     $template.on('$unmount', () => {
-      const $container = getMountNode()
+      const $root = getMountNode()
       actions.forEach((item, i) => {
         const { info, action } = item
-        $container.off(...info, action)
+        $root.off(...info, action)
         actions.splice(i, 1)
       })
     })
   }
 
   function render(update) {
-    const $container = getMountNode()
+    const $root = getMountNode()
 
-    removeEffect($container, scope)
+    initCompile($root)
 
     const template = $template.html()
-    const html = compile(template, scope, components, directives)
+    const html = compile([], $root, components, directives, { template, scope })
 
     if (!!update) {
-      diffAndPatch($container, $('<div />').html(html), true)
+      diffAndPatch($root, $('<div />').html(html), true)
     }
     else {
-      $container.html(html)
+      $root.html(html)
     }
 
-    affect($container, scope, components, directives)
+    affect($root, scope)
 
     const attrs = $template.attr('attrs')
     if (attrs) {
@@ -230,26 +233,26 @@ function vm(initState) {
       each(props, (value, key) => {
         if (key === 'class') {
           const items = value.split(' ')
-          items.forEach(item => $container.addClass(item))
+          items.forEach(item => $root.addClass(item))
         }
         else if (key === 'style') {
           if (isObject(value)) {
-            $container.css(value)
+            $root.css(value)
           }
           else if (isString(value)) {
-            const style = $container.attr('style') || ''
+            const style = $root.attr('style') || ''
             const rules = style.split(';').concat(value.split(';')).filter(item => !!item)
             const stylesheet = uniqueArray(rules).join(';')
-            $container.attr('style', stylesheet)
+            $root.attr('style', stylesheet)
           }
         }
         else {
-          $container.attr(key, value)
+          $root.attr(key, value)
         }
       })
     }
 
-    $container.trigger('$render')
+    $root.trigger('$render')
   }
 
   function diffAndPatch($current, $next, top) {
@@ -350,8 +353,8 @@ function vm(initState) {
   }
 
   function change(...args) {
-    const $container = getMountNode()
-    $container.trigger('$change', ...args)
+    const $root = getMountNode()
+    $root.trigger('$change', ...args)
   }
 
   function mount(el) {
@@ -359,30 +362,30 @@ function vm(initState) {
       return view
     }
 
-    if ($template.next(container).length) {
+    if ($template.next(root).length) {
       return view
     }
 
     init(initState)
 
-    let $container = null
+    let $root = null
 
     mountTo = el || null // cache mount node
     isMounted = true
 
     if (el) {
-      $container = $(el)
-      $container.attr('jq-vm', hash)
+      $root = $(el)
+      $root.attr('jq-vm', hash)
     }
     // like $('<template>aaa</template>').vm(...)
     else if (!$(document).find($template).length) {
       throw new Error('el should must be passed by view.mount')
     }
     else {
-      $container = $('<div />', {
+      $root = $('<div />', {
         'jq-vm': hash,
       })
-      $template.after($container)
+      $template.after($root)
     }
 
     if (typeof vm.watch === 'function') {
@@ -392,7 +395,7 @@ function vm(initState) {
 
     render()
     $template.trigger('$mount')
-    $container.trigger('$mount')
+    $root.trigger('$mount')
 
     return view
   }
@@ -402,13 +405,13 @@ function vm(initState) {
       return view
     }
 
-    const $container = getMountNode()
+    const $root = getMountNode()
 
-    if (!$container.length) {
+    if (!$root.length) {
       return
     }
 
-    $container.trigger('$unmount')
+    $root.trigger('$unmount')
     $template.trigger('$unmount')
 
     if (typeof vm.unwatch === 'function') {
@@ -417,11 +420,11 @@ function vm(initState) {
     }
 
     if (mountTo) {
-      $container.html('')
-      $container.removeAttr('jq-vm')
+      $root.html('')
+      $root.removeAttr('jq-vm')
     }
     else {
-      $container.remove()
+      $root.remove()
     }
 
     mountTo = null
@@ -471,14 +474,14 @@ function vm(initState) {
 
   function unbind(args) {
     if (args.length === 1) {
-      const $container = getMountNode()
-      $container.off(...args)
+      const $root = getMountNode()
+      $root.off(...args)
       return
     }
 
     const info = [...args]
     const fn = info.pop()
-    const $container = getMountNode()
+    const $root = getMountNode()
 
     actions.forEach((item, i) => {
       const { info, action } = item
@@ -486,14 +489,14 @@ function vm(initState) {
         return
       }
 
-      $container.off(...info, action)
+      $root.off(...info, action)
       actions.splice(i, 1)
     })
   }
 
   function find(selector) {
-    const $container = getMountNode()
-    return $container.find(selector)
+    const $root = getMountNode()
+    return $root.find(selector)
   }
 
   Object.assign(view, {
@@ -536,8 +539,8 @@ directive('jq-repeat', function($el, attrs) {
   const [kv, , dataKey, , traceBy] = attr.split(' ')
   const [valueName, keyName] = kv.split(',')
 
-  const { scope, components, directives } = this
-  const data = scope.parse(dataKey)
+  const { scope: parentScope, compile } = this
+  const data = parentScope.parse(dataKey)
 
   // make it not be able to compile again
   $el.removeAttr('jq-repeat')
@@ -547,12 +550,12 @@ directive('jq-repeat', function($el, attrs) {
   const $els = []
 
   each(data, (value, key) => {
-    const scope = this.scope.$new({
+    const scope = parentScope.$new({
       [keyName]: key,
       [valueName]: value,
     })
 
-    const result = compile(template, scope, components, directives)
+    const result = compile({ template, scope })
     const html = scope.interpolate(result)
     const $item = $(html)
 
@@ -594,18 +597,7 @@ directive('jq-class', function($el, attrs) {
 directive('jq-value', null, function($el, attrs) {
   const attr = attrs['jq-value']
   const value = this.scope.parse(attr)
-  if ($el.is('select')) {
-    if (value) {
-      const option = $el.find(`option[value=${value}]`)
-      option.prop('selected', true)
-    }
-  }
-  else if ($el.is('input')) {
-    $el.val(value)
-  }
-  else if ($el.is('textarea')) {
-    $el.val(value)
-  }
+  $el.val(value)
 })
 
 directive('jq-disabled', null, function($el, attrs) {
