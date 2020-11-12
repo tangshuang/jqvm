@@ -313,7 +313,9 @@ function vm(initState) {
         if ($prev.length) {
           const prev = $prev[0]
           // move it
-          parentNode.insertBefore(prev, current)
+          if (prev !== current) {
+            parentNode.insertBefore(prev, current)
+          }
           // update the node
           diffAndPatch($prev, $next)
         }
@@ -589,31 +591,22 @@ directive('jq-class', function($el, attrs) {
   })
 })
 
-directive(
-  'jq-value',
-  function($el, attrs) {
-    const attr = attrs['jq-value']
-    const value = this.scope.parse(attr)
-
-    if ($el.is('select')) {
-      if (value) {
-        const option = $el.find(`option[value=${value}]`)
-        option.attr('selected', 'selected')
-      }
+directive('jq-value', null, function($el, attrs) {
+  const attr = attrs['jq-value']
+  const value = this.scope.parse(attr)
+  if ($el.is('select')) {
+    if (value) {
+      const option = $el.find(`option[value=${value}]`)
+      option.prop('selected', true)
     }
-    else if ($el.is('input')) {
-      $el.attr('value', value)
-    }
-    else if ($el.is('textarea')) {
-      $el.text(value)
-    }
-  },
-  function($el, attrs) {
-    const attr = attrs['jq-value']
-    const value = this.scope.parse(attr)
+  }
+  else if ($el.is('input')) {
     $el.val(value)
-  },
-)
+  }
+  else if ($el.is('textarea')) {
+    $el.val(value)
+  }
+})
 
 directive('jq-disabled', null, function($el, attrs) {
   const attr = attrs['jq-disabled']
