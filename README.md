@@ -335,12 +335,16 @@ Example of `affect`:
 directive('jq-src', null, function($el, attrs) {
   // here $el is real DOM element referer
   const attr = attrs['jq-src']
-  const value = this.scope.parse(attr)
+  const value = this.scope.interpolate(attr)
   $el.attr('src', value)
 })
 ```
 
 This is the source code of `jq-src`, by this operation, image will not be loaded when compiling, and will be loaded after insert into DOM.
+
+```html
+<img jq-src="/xxx/{{id}}.jpg" />
+```
 
 You can even bind event listeners to $el:
 
@@ -363,7 +367,7 @@ Here are builtin directives:
 - `jq-checked="!!exp"` only used on `input[type=checkbox]` `input[type=radio]`
 - `jq-selected="!!exp"` only used on `select > option`
 - `jq-bind="keyPath"` two way binding, only used on `input` `select` `textarea`, when user type in, the `keyPath` value of vm will be update automaticly
-- `jq-src="exp"` only used on `img`, you should always use jq-src instead of `src`
+- `jq-src="{{exp}}"` only used on `img`, you should always use jq-src instead of `src`
 - `jq-repeat` print serval times
 
 The `jq-repeat` usage is a little complex:

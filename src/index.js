@@ -654,7 +654,7 @@ directive(
 
 directive('jq-src', null, function($el, attrs) {
   const attr = attrs['jq-src']
-  const value = this.scope.parse(attr)
+  const value = this.scope.interpolate(attr)
   $el.attr('src', value)
 })
 
