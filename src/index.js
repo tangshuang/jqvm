@@ -308,10 +308,14 @@ function vm(initState) {
       const $next = $(next)
       const current = parentNode.childNodes[i]
       const $current = $(current)
-
-      // move exist element
       const nextId = $next.attr('jq-id')
-      if (nextId) {
+
+      // current index node not existing, insert the coming node directly
+      if (!current) {
+        parentNode.insertBefore(next, current)
+      }
+      // move exist element, use `jq-id` to unique element
+      else if (nextId) {
         const $prev = $parent.find(`[jq-id=${nextId}]`)
         if ($prev.length) {
           const prev = $prev[0]
@@ -326,17 +330,14 @@ function vm(initState) {
           parentNode.insertBefore(next, current)
         }
       }
-
       // insert coming child directly
       else if (next.nodeName !== current.nodeName) {
         parentNode.insertBefore(next, current)
       }
-
       // diff and patch element
       else if (next.nodeName !== '#text') {
         diffAndPatch($current, $next)
       }
-
       // diff and patch text
       else {
         if (next.textContent !== current.textContent) {
