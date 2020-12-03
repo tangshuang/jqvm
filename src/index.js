@@ -349,7 +349,9 @@ function vm(initState) {
     // remove no use elements
     for (let i = nextChildren.length, len = current.childNodes.length; i < len; i ++) {
       const child = current.childNodes[i]
-      current.removeChild(child)
+      if (child) {
+        current.removeChild(child)
+      }
     }
   }
 
