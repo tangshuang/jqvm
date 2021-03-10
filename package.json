@@ -25,9 +25,14 @@
   "dependencies": {
     "jquery": "^3.5.1",
     "scopex": "^2.1.0",
-    "ts-fns": "^8.1.10"
+    "ts-fns": "^9.3.1"
   },
   "devDependencies": {
+    "@babel/core": "^7.13.10",
+    "@babel/plugin-proposal-object-rest-spread": "^7.13.8",
+    "@babel/plugin-transform-parameters": "^7.13.0",
+    "@babel/plugin-transform-spread": "^7.13.0",
+    "babel-loader": "^8.2.2",
     "webpack": "^4.44.0",
     "webpack-cli": "^3.3.12",
     "webpack-dev-server": "^3.11.0"

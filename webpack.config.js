@@ -14,6 +14,21 @@ const bundle = {
       'ts-fns$': 'ts-fns/es',
     },
   },
+  module: {
+    rules: [
+      {
+        test: /\.js$/,
+        loader: 'babel-loader',
+        options: {
+          plugins: [
+            '@babel/plugin-proposal-object-rest-spread',
+            '@babel/plugin-transform-spread',
+            '@babel/plugin-transform-parameters',
+          ],
+        },
+      }
+    ],
+  },
   externals: {
     jquery: {
       root: 'jQuery',
