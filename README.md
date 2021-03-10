@@ -104,10 +104,9 @@ Here, you call the `on` method and pass a action function to change `state`, and
 
 `$.vm` is a set of jqvm static services. It contains:
 
-- component(name, compile, affect): global component register function
-- directive(name, compile, affect): global directive register function
-- filter(name, formatter): global filter register function
-- ViewModel: vm constructor
+- component(name:string, compile:function, affect:function): global component register function
+- directive(name:string, compile:function, affect:function): global directive register function
+- filter(name:string, formatter:function): global filter register function
 - View: view constructor
 
 ### $.fn.vm
@@ -118,7 +117,7 @@ JQVM is a jQuery plugin first at all, you should use code like this:
 const view = $('#app').vm(initState)
 ```
 
-JQVM will treat html in #app as template, so, it is recommended to use `template` tag to define template.
+JQVM will treat html string in #app as template, so, it is recommended to use `template` tag to define template.
 
 The return value is a `view` object which has methods:
 
@@ -152,8 +151,9 @@ Now, let's look into `action` detail.
 
 ```js
 // a function which return a inner function
+// state: the current state in vm
 function action(state) {
-  const view = this // view.unmount()
+  const view = this // you can do like `view.unmount()`
 
   // handle function which is put into jQuery.fn.on as you did like `$('#app').on('click', handle)`
   // handle function is optional, when you do not return handle function, action will still be invoked when the event happens, but you have no idea to receive DOM event
@@ -182,17 +182,18 @@ $('#app')
   .mount()
 ```
 
-The `state` object you receive in action function is a reactive object which is like what vue does. So you can change properties of it directly to trigger rerendering.
+The changing of `state` object you receive in action function will trigger rerendering.
 And the scope in template is `state`, so when you write a `{{title}}` syntax in template, you are calling `state.title` in fact.
 `state` is only available in `on` action functions.
 
-It is created from `initState` which is received by `$('#app').vm(initState)`, `innitState` can be one of:
+*You should always change `state` instead of changing DOM to trigger UI changing. You should not change DOM in `action` function unless you know what you are doing!*
+
+It is created from `initState` which is received by `$('#app').vm(initState)`, `initState` can be one of:
 
 - object: a normal object which is used to be vm's default state.
-- vm: an instance of `ViewModel`
 - function: which returns one of above
 
-*Notice, an instance of some class, for example `new Some()`, is not recommeded to pass in.*
+*Notice, an instance of some class, for example `new Some()`, should not be passed in, only normal object supported.*
 
 When you pass a normal object, the original object will be changed by vm. This make it shared amoung different mounting.
 To prevent this, you can use a function to return an independent object in the function.
@@ -206,97 +207,6 @@ view.mount()
 view.unmount() // destory DOM
 view.mount() // use `init` function to generate independent initState
 ```
-
-I will detail `ViewModel` in following parts.
-
-## :truck: ViewModel
-
-```js
-const { ViewModel } = $.vm
-const vm = new ViewModel({
-  ...
-})
-
-$('#app')
-  .vm(vm)
-  .on('click', 'button', state => (e) => {
-    state.name = 'new name'
-  })
-  .mount()
-```
-
-This make vm shared, the `vm` will be used again amoung mountings.
-
-```js
-$('#app')
-  .vm(function() {
-    const { ViewModel } = $.vm
-    const vm = new ViewModel({
-      ...
-    })
-    return vm
-  })
-  .mount()
-```
-
-This make vm independent, it will create one new `vm` in each mounting.
-
-`ViewModel` is extended from tyshemo's `Store`, you can know more from [tyshemo](https://tyshemo.js.org).
-
-## :bulb: Model
-
-First at all, you should read [tyshemo](https://tyshemo.js.org) to know how to use `Model`.
-
-To use a Model, you can provide more information in `on` action.
-
-```js
-import { Model, Meta } from 'tyshemo'
-
-class Name extends Meta {
-  static default = 'tomy'
-  static type = String
-}
-class Age extends Meta {
-  static default = 0
-  static type = Number
-}
-
-class Person extends ViewModel {
-  schema() {
-    return {
-      name: Name,
-      age: Age,
-    }
-  }
-
-  state() {
-    return {
-      books: []
-    }
-  }
-
-  grow() {
-    this.age ++
-  }
-
-  study(book) {
-    this.books.push(book)
-  }
-}
-
-$('#app')
-  .vm(new Person()) // shared, or .vm(() => new Person()) for indenpendent
-  .on('click', '.grow', model => {
-    model.grow()
-  })
-  .on('study', '.study', model => {
-    const book = new Book() // define Book somewhere
-    model.study(book)
-  })
-  .mount()
-```
-
-This is what you can do with `Model`.
 
 ## :dizzy: Directive
 

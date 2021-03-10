@@ -79,7 +79,6 @@
     <div id="model"></div>
 
     <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
-    <script src="https://unpkg.com/tyshemo/dist/tyshemo.min.js"></script>
     <script src="dist/jqvm.js"></script>
 
     <script>
@@ -104,44 +103,34 @@
           keep: 0,
           range: 0,
         })
-        .on('click', '.toggle', vm => vm.show = !vm.show)
-        .on('input', '[data-title-input]', vm => function(e) {
+        .on('click', '.toggle', state => state.show = !state.show)
+        .on('input', '[data-title-input]', state => function(e) {
           const value = e.target.value
-          vm.title = value
+          state.title = value
         })
-        .on('input', '[data-text-input]', vm => function(e) {
+        .on('input', '[data-text-input]', state => function(e) {
           const value = e.target.value
-          vm.text = value
+          state.text = value
         })
-        .on('change', '[data-checkbox]', vm => {
-          vm.checked = !vm.checked
+        .on('change', '[data-checkbox]', state => {
+          state.checked = !state.checked
         })
-        .on('change', '[name=radio]', vm => function(e) {
+        .on('change', '[name=radio]', state => function(e) {
           const value = e.target.value
-          vm.radio = value
+          state.radio = value
         })
-        .on('change', '[data-select]', vm => function(e) {
+        .on('change', '[data-select]', state => function(e) {
           const value = e.target.value
-          vm.select = value
+          state.select = value
         })
-        .on('input', '[data-range]', vm => function(e) {
+        .on('input', '[data-range]', state => function(e) {
           const value = e.target.value
-          vm.range = value
+          state.range = value
         })
-        .on('click', '[data-change-by-hash]', vm => {
-          vm.keep ++
+        .on('click', '[data-change-by-hash]', state => {
+          state.keep ++
         })
         .mount()
-
-      const { Model, Meta } = window.tyshemo
-      class Person extends Model {
-        static name = new Meta({
-          default: '',
-        })
-        static age = new Meta({
-          default: 0,
-        })
-      }
 
       const template = `
         <template>
@@ -152,13 +141,16 @@
         </template>
       `
       $(template)
-        .vm(new Person())
-        .on('$mount', vm => () => {
-          vm.name = 'timy'
-          vm.age = 12
+        .vm({
+          name: '',
+          age: 0,
         })
-        .on('click', '[data-grow]', vm => () => {
-          vm.age ++
+        .on('$mount', state => () => {
+          state.name = 'timy'
+          state.age = 12
+        })
+        .on('click', '[data-grow]', state => () => {
+          state.age ++
         })
         .on('click', '[data-destroy]', function() {
           this.unmount()

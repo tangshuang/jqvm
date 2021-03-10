@@ -1,13 +1,10 @@
-import ViewModel from 'tyshemo/src/store'
 import ScopeX from 'scopex'
-import { isNone, each, isInstanceOf, isObject, isFunction, isString, diffArray, uniqueArray } from 'ts-fns'
-
+import { isNone, each, isObject, isFunction, isString, diffArray, uniqueArray, getObjectHash, throttle } from 'ts-fns'
 import { createAttrs, getPath } from './utils.js'
 
 let vmId = 0
 let $ = null
-
-class View {}
+function View() {}
 
 // ---------------
 
@@ -15,22 +12,23 @@ const globalComponents = []
 const globalDirectives = []
 const globalFilters = {}
 
-function component(name, compile, affect) {
-  globalComponents.forEach((item, i) => {
-    if (item[0] === name) {
-      globalComponents.splice(i, 1)
+function _push(list, name, compile, affect) {
+  for (let i = 0, len = list.length; i < len; i ++) {
+    const item = list[i]
+    if (item.name === name) {
+      list[i] = [name, compile, affect]
+      return
     }
-  })
-  globalComponents.push([name, compile, affect])
+  }
+  list.push([name, compile, affect])
+}
+
+function component(name, compile, affect) {
+  _push(globalComponents, name, compile, affect)
 }
 
 function directive(name, compile, affect) {
-  globalDirectives.forEach((item, i) => {
-    if (item[0] === name) {
-      globalDirectives.splice(i, 1)
-    }
-  })
-  globalDirectives.push([name, compile, affect])
+  _push(globalDirectives, name, compile, affect)
 }
 
 function filter(name, fn) {
@@ -41,7 +39,7 @@ function filter(name, fn) {
 
 const initCompile = ($root) => {
   const root = $root[0]
-  const records = root.jQvmCompiledRecords = root.jQvmCompiledRecords || []
+  const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   if (!records.length) {
     return
@@ -60,7 +58,7 @@ const initCompile = ($root) => {
 
 const compile = (prefix = [], $root, components, directives, { template, scope }) => {
   const root = $root[0]
-  const records = root.jQvmCompiledRecords = root.jQvmCompiledRecords || []
+  const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   const $element = $('<div />').html(template)
 
@@ -107,7 +105,7 @@ const compile = (prefix = [], $root, components, directives, { template, scope }
 
 const affect = ($root, scope) => {
   const root = $root[0]
-  const records = root.jQvmCompiledRecords = root.jQvmCompiledRecords || []
+  const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   records.forEach((record) => {
     const { selectors, affect, attrs } = record
@@ -132,7 +130,6 @@ function vm(initState) {
     return mountTo ? $(mountTo) : $template.next(root)
   }
 
-  let vm = null
   let state = null
   let scope = null
 
@@ -172,23 +169,12 @@ function vm(initState) {
       initState = initState()
     }
 
-    if (isInstanceOf(initState, ViewModel)) {
-      vm = initState
-      state = vm.state
-      scope = new ScopeX(state)
-    }
-    else if (isObject(initState)) {
-      vm = new ViewModel(initState)
-      state = vm.state
-      scope = new ScopeX(state)
-    }
-    else if (initState && typeof initState === 'object') {
-      vm = initState
-      state = initState
-      scope = new ScopeX(state)
+    if (!initState || typeof initState !== 'object') {
+      throw new Error('initState should must be an object')
     }
 
-    scope.filters = filters
+    state = initState
+    scope = new ScopeX(state, { filters })
   }
 
   function listen() {
@@ -355,9 +341,9 @@ function vm(initState) {
     }
   }
 
-  function change(...args) {
+  function change() {
     const $root = getMountNode()
-    $root.trigger('$change', ...args)
+    $root.trigger('$change')
   }
 
   function mount(el) {
@@ -391,11 +377,6 @@ function vm(initState) {
       $template.after($root)
     }
 
-    if (typeof vm.watch === 'function') {
-      vm.watch('*', render, true)
-      vm.watch('*', change, true)
-    }
-
     render()
     $template.trigger('$mount')
     $root.trigger('$mount')
@@ -417,11 +398,6 @@ function vm(initState) {
     $root.trigger('$unmount')
     $template.trigger('$unmount')
 
-    if (typeof vm.unwatch === 'function') {
-      vm.unwatch('*', render)
-      vm.unwatch('*', change)
-    }
-
     if (mountTo) {
       $root.html('')
       $root.removeAttr('jq-vm')
@@ -439,7 +415,6 @@ function vm(initState) {
   function destroy() {
     unmount()
 
-    vm = null
     state = null
     scope = null
     actions.length = 0
@@ -466,10 +441,29 @@ function vm(initState) {
   function bind(args, once) {
     const info = [...args]
     const fn = info.pop()
+
+    let latestHash = null
+    const nextTick = throttle(() => {
+      const currentHash = getObjectHash(state)
+      if (latestHash !== currentHash) {
+        change()
+        render(true)
+      }
+      latestHash = currentHash
+    }, 16)
+
+
     const action = function(e) {
+      latestHash = getObjectHash(state)
+
       const handle = fn.call(view, state)
-      return isFunction(handle) ? handle.call(this, e) : null
+      const res = isFunction(handle) ? handle.call(this, e) : null
+
+      nextTick()
+
+      return res
     }
+
     const type = once ? 'one' : 'on'
 
     actions.push({ type, info, fn, action })
@@ -670,7 +664,6 @@ function useJQuery(jQuery) {
     component,
     directive,
     filter,
-    ViewModel,
     View,
   }
   return $
@@ -681,4 +674,4 @@ if (typeof jQuery !== 'undefined') {
   useJQuery(jQuery)
 }
 
-export { component, directive, filter, ViewModel, View, useJQuery }
+export { component, directive, filter, View, useJQuery }
