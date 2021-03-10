@@ -438,23 +438,29 @@ function vm(initState) {
     return view
   }
 
+  let latestHash = null
+  const currTick = () => {
+    if (!latestHash) {
+      latestHash = getObjectHash(state)
+    }
+  }
+  const nextTick = throttle(() => {
+    if (!latestHash) {
+      return
+    }
+    const currentHash = getObjectHash(state)
+    if (latestHash !== currentHash) {
+      change()
+      render(true)
+    }
+    latestHash = null
+  }, 16)
   function bind(args, once) {
     const info = [...args]
     const fn = info.pop()
 
-    let latestHash = null
-    const nextTick = throttle(() => {
-      const currentHash = getObjectHash(state)
-      if (latestHash !== currentHash) {
-        change()
-        render(true)
-      }
-      latestHash = currentHash
-    }, 16)
-
-
     const action = function(e) {
-      latestHash = getObjectHash(state)
+      currTick()
 
       const handle = fn.call(view, state)
       const res = isFunction(handle) ? handle.call(this, e) : null
