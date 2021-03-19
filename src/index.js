@@ -420,24 +420,6 @@ function vm(initState) {
     actions.length = 0
   }
 
-  function update(nextState) {
-    if (!isMounted) {
-      return view
-    }
-
-    if (isFunction(nextState)) {
-      nextState = nextState(state)
-    }
-
-    if (isObject(nextState)) {
-      Object.assign(state, nextState)
-    }
-
-    render(true)
-
-    return view
-  }
-
   let latestHash = null
   const currTick = () => {
     if (!latestHash) {
@@ -455,6 +437,33 @@ function vm(initState) {
     }
     latestHash = null
   }, 16)
+
+  function update(nextState) {
+    if (!isMounted) {
+      return view
+    }
+
+    // 强制更新
+    if (nextState === true) {
+      render(true)
+      return view
+    }
+
+    currTick()
+
+    if (isFunction(nextState)) {
+      nextState = nextState(state)
+    }
+
+    if (isObject(nextState)) {
+      Object.assign(state, nextState)
+    }
+
+    nextTick()
+
+    return view
+  }
+
   function bind(args, once) {
     const info = [...args]
     const fn = info.pop()
