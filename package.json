@@ -23,7 +23,7 @@
   "author": "frustigor",
   "license": "MIT",
   "dependencies": {
-    "jquery": "^3.5.1",
+    "jquery": "^3.6.0",
     "scopex": "^2.1.0",
     "ts-fns": "^9.3.1"
   },
