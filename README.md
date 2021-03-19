@@ -131,6 +131,7 @@ The return value is a `view` object which has methods:
 - component(name, compile, affect): register component only for this vm
 - directive(name, compile, affect): register directive only for this vm
 - filter(name, formatter): register formatter only for this vm
+- fn(name, action?): register a function on `view`, when you not pass `func`, it means you want to get the function, `action` is the same usage as `on`
 
 The `mount` method can receive a selector or a jquery element.
 
@@ -279,6 +280,7 @@ Here are builtin directives:
 - `jq-bind="keyPath"` two way binding, only used on `input` `select` `textarea`, when user type in, the `keyPath` value of vm will be update automaticly
 - `jq-src="{{exp}}"` only used on `img`, you should always use jq-src instead of `src`
 - `jq-repeat` print serval times
+- `jq-on="event:fn"` bind event callback function
 
 The `jq-repeat` usage is a little complex:
 
@@ -291,6 +293,18 @@ The `jq-repeat` usage is a little complex:
 ```
 
 Notice, `value,index` should have NO space inside, `,index` is optional.
+
+The `jq-on` directive should must work with `view.fn`, for example:
+
+```html
+<button jq-on="click:handleSubmit">submit</button>
+
+<script>
+  $('..').vm({}).fn('handleSubmit', state => function(e) {
+    ...
+  })
+</script>
+```
 
 ## :clown_face: Component
 

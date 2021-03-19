@@ -47,7 +47,7 @@ export function getPath($element, $root, prefix = []) {
 
   const index = [...$parent.children()].findIndex(child => child === $element[0])
   const name = $element[0].nodeName.toLowerCase()
-  const path = [`${name}:eq(${index})`]
+  const path = [`${name}:nth-child(${index + 1})`]
 
   let level = 0
   while ($parent[0] !== $root[0]) {
@@ -57,7 +57,7 @@ export function getPath($element, $root, prefix = []) {
     const index = [...$parent.children()].findIndex(child => child === $element[0])
     const name = $element[0].nodeName.toLowerCase()
 
-    path.unshift(`${name}:eq(${index})`)
+    path.unshift(`${name}:nth-child(${index + 1})`)
 
     level ++
     if (level > 20) {

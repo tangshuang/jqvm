@@ -78,6 +78,12 @@
 
     <div id="model"></div>
 
+    <template id="count">
+      <div class="count">{{count}}</div>
+      <button jq-on="click:plus">+</button>
+      <button jq-on="click:minus">-</button>
+    </template>
+
     <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
     <script src="dist/jqvm.js"></script>
 
@@ -132,15 +138,14 @@
         })
         .mount()
 
-      const template = `
+      $(`
         <template>
           <div class="name">{{name}}</div>
           <div class="age">{{age}}</div>
           <button data-grow>Grow</button>
           <button data-destroy>Destroy</button>
         </template>
-      `
-      $(template)
+      `)
         .vm({
           name: '',
           age: 0,
@@ -156,6 +161,13 @@
           this.unmount()
         })
         .mount('#model')
+
+      $('#count')
+        .vm({ count: 0 })
+        .on('click', 'button:nth-child(2)', () => console.log('hint---<>'))
+        .fn('plus', state => state.count ++)
+        .fn('minus', state => state.count --)
+        .mount()
     </script>
   </body>
 </html>

@@ -37,7 +37,8 @@ function filter(name, fn) {
 
 // ----------- compiler ---------------
 
-const initCompile = ($root) => {
+// clear and revoke effects
+const prepare = ($root) => {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
@@ -62,19 +63,20 @@ const compile = (prefix = [], $root, components, directives, { template, scope }
 
   const $element = $('<div />').html(template)
 
-  const createIterator = (fn, affect) => function() {
+  const createIterator = (onCompile, affect) => function() {
     const $el = $(this)
     const attrs = createAttrs(this.attributes)
-    const parentPath = getPath($el.parent(), $element, prefix)
 
     let selectors = []
 
-    if (typeof fn === 'function') {
+    if (typeof onCompile === 'function') {
       // developers can recompile inside fn
-      const output = fn.call({
+      const parentPath = getPath($el.parent(), $element, prefix)
+      const context = {
         scope,
         compile: compile.bind(null, parentPath, $root, components, directives),
-      }, $el, attrs)
+      }
+      const output = onCompile.call(context, $el, attrs)
       if (!isNone(output) && $el !== output) {
         const $newEls = $(output)
         $el.replaceWith($newEls)
@@ -103,7 +105,7 @@ const compile = (prefix = [], $root, components, directives, { template, scope }
   return result
 }
 
-const affect = ($root, scope) => {
+const affect = ($root, scope, view) => {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
@@ -113,7 +115,7 @@ const affect = ($root, scope) => {
       return
     }
     const $el = $root.find(selectors.join(','))
-    const revoke = affect.call({ $root, scope }, $el, attrs)
+    const revoke = affect.call({ $root, scope, view }, $el, attrs)
     if (typeof revoke === 'function') {
       record.revoke = revoke
     }
@@ -126,15 +128,15 @@ function vm(initState) {
   const $template = $(this)
   const hash = $template.attr('id') || $template.attr('jq-vm-id') || (vmId ++, vmId)
   const root = `[jq-vm=${hash}]`
-  const getMountNode = () => {
-    return mountTo ? $(mountTo) : $template.next(root)
-  }
 
   let state = null
   let scope = null
 
   let mountTo = null
   let isMounted = false
+  const getMountNode = () => {
+    return mountTo ? $(mountTo) : $template.next(root)
+  }
 
   const actions = []
   const view = new View()
@@ -147,6 +149,7 @@ function vm(initState) {
 
   function component(name, affect) {
     components[name] = affect
+    return view
   }
 
   function directive(name, affect) {
@@ -156,10 +159,12 @@ function vm(initState) {
       }
     })
     directives.push([name, affect])
+    return view
   }
 
   function filter(name, fn) {
     filters[name] = fn
+    return view
   }
 
   // ------------
@@ -174,7 +179,7 @@ function vm(initState) {
     }
 
     state = initState
-    scope = new ScopeX(state, { filters })
+    scope = new ScopeX(state, { filters, loose: true })
   }
 
   function listen() {
@@ -199,7 +204,7 @@ function vm(initState) {
   function render(update) {
     const $root = getMountNode()
 
-    initCompile($root)
+    prepare($root)
 
     const template = $template.html()
     const html = compile([], $root, components, directives, { template, scope })
@@ -211,7 +216,7 @@ function vm(initState) {
       $root.html(html)
     }
 
-    affect($root, scope)
+    affect($root, scope, view)
 
     const attrs = $template.attr('attrs')
     if (attrs) {
@@ -511,6 +516,17 @@ function vm(initState) {
     return $root.find(selector)
   }
 
+  const fns = {}
+  function fn(name, action) {
+    if (!action) {
+      return fns[name]
+    }
+    else {
+      fns[name] = action
+    }
+    return view
+  }
+
   Object.assign(view, {
     once(...args) {
       bind(args, true)
@@ -532,6 +548,7 @@ function vm(initState) {
     component,
     directive,
     filter,
+    fn,
   })
 
   listen()
@@ -551,7 +568,7 @@ directive('jq-repeat', function($el, attrs) {
   const [kv, , dataKey, , traceBy] = attr.split(' ')
   const [valueName, keyName] = kv.split(',')
 
-  const { scope: parentScope, compile } = this
+  const { scope: parentScope, compile, view } = this
   const data = parentScope.parse(dataKey)
 
   // make it not be able to compile again
@@ -570,7 +587,7 @@ directive('jq-repeat', function($el, attrs) {
     }
     const scope = parentScope.$new(newScope)
 
-    const result = compile({ template, scope })
+    const result = compile({ template, scope, view })
     const html = scope.interpolate(result)
     const $item = $(html)
 
@@ -668,6 +685,21 @@ directive('jq-src', null, function($el, attrs) {
   const attr = attrs['jq-src']
   const value = this.scope.interpolate(attr)
   $el.attr('src', value)
+})
+
+directive('jq-on', null, function($el, attrs) {
+  const attr = attrs['jq-on']
+  const [event, name] = attr.split(':')
+
+  const { view, $root } = this
+  const fn = view.fn(name)
+  if (!fn) {
+    return
+  }
+
+  const path = getPath($el, $root)
+  view.on(event, path, fn)
+  return () => view.off(event, path, fn)
 })
 
 // --------------------------------
