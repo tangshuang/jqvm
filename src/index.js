@@ -170,29 +170,34 @@ function vm(initState) {
   // ------------
 
   let latestHash = null
-  const currTick = () => {
-    if (!state) {
+  let nextRunner = null
+  const nextTick = () => {
+    if (!state || !latestHash) {
       return
     }
-    if (!latestHash) {
-      latestHash = getObjectHash(state)
-    }
-  }
-  const nextTick = throttle(() => {
-    if (!state) {
-      return
-    }
-    if (!latestHash) {
-      return
-    }
-    const currentHash = getObjectHash(state)
 
-    if (latestHash !== currentHash) {
-      change()
-      render(true)
+    const now = Date.now()
+
+    // there is a runner waiting to run
+    if (nextRunner && nextRunner > now) {
+      return
     }
-    latestHash = null
-  }, 8)
+
+    nextRunner = now + 8 // next runner will run after 8ms
+    setTimeout(() => {
+      const currentHash = getObjectHash(state)
+      if (latestHash !== currentHash) {
+        change()
+        render(true)
+      }
+
+      nextRunner = null
+      latestHash = currentHash
+    }, 8)
+  }
+  const currTick = () => {
+    latestHash = getObjectHash(state)
+  }
 
   // -------------
 
@@ -206,13 +211,10 @@ function vm(initState) {
     }
 
     state = createReactive(initState, {
-      set(keyPath, value) {
-        currTick()
-        return value
-      },
       dispatch: nextTick,
     })
     scope = new ScopeX(state, { filters, loose: true })
+    currTick()
   }
 
   function listen() {
@@ -463,13 +465,13 @@ function vm(initState) {
       return view
     }
 
-    // 强制更新
+    // force update
     if (nextState === true) {
       render(true)
       return view
     }
 
-    // 传参的情况下，通过参数修改state来更新
+    // when nextState passed, assign to state will trigger rerender
     if (nextState) {
       if (isFunction(nextState)) {
         nextState = nextState(state)
@@ -479,7 +481,7 @@ function vm(initState) {
         Object.assign(state, nextState)
       }
     }
-    // 未传参的情况下，检查更新
+    // if not passed nextState, it means to check manually
     else {
       nextTick()
     }
