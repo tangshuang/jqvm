@@ -156,6 +156,12 @@ Now, let's look into `action` detail.
 function action(state) {
   const view = this // you can do like `view.unmount()`
 
+  state.some = 'next' // `some` should be exisiting in state, and this will trigger rerendering later
+  // if `some` is not in state, you should MUST use `state.$set('some', 'next')
+  // async works, i.e. setTimeout(() => state.some = 'next', 1000)
+  // if you change some instances which is not a plain object, you should invoke `view.update()` manually,
+  // i.e. `state.myIns.name = 'new name'; view.update()`
+
   // handle function which is put into jQuery.fn.on as you did like `$('#app').on('click', handle)`
   // handle function is optional, when you do not return handle function, action will still be invoked when the event happens, but you have no idea to receive DOM event
   return function handle(e) {

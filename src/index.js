@@ -1,5 +1,5 @@
 import ScopeX from 'scopex'
-import { isNone, each, isObject, isFunction, isString, diffArray, uniqueArray, getObjectHash, throttle } from 'ts-fns'
+import { isNone, each, isObject, isFunction, isString, diffArray, uniqueArray, getObjectHash, throttle, createReactive } from 'ts-fns'
 import { createAttrs, getPath } from './utils.js'
 
 let vmId = 0
@@ -169,16 +169,49 @@ function vm(initState) {
 
   // ------------
 
+  let latestHash = null
+  const currTick = () => {
+    if (!state) {
+      return
+    }
+    if (!latestHash) {
+      latestHash = getObjectHash(state)
+    }
+  }
+  const nextTick = throttle(() => {
+    if (!state) {
+      return
+    }
+    if (!latestHash) {
+      return
+    }
+    const currentHash = getObjectHash(state)
+
+    if (latestHash !== currentHash) {
+      change()
+      render(true)
+    }
+    latestHash = null
+  }, 8)
+
+  // -------------
+
   function init(initState) {
     if (isFunction(initState)) {
-      initState = initState()
+      initState = initState.call(view)
     }
 
     if (!initState || typeof initState !== 'object') {
       throw new Error('initState should must be an object')
     }
 
-    state = initState
+    state = createReactive(initState, {
+      set(keyPath, value) {
+        currTick()
+        return value
+      },
+      dispatch: nextTick,
+    })
     scope = new ScopeX(state, { filters, loose: true })
   }
 
@@ -201,7 +234,7 @@ function vm(initState) {
     })
   }
 
-  function render(update) {
+  function render(isUpdating) {
     const $root = getMountNode()
 
     prepare($root)
@@ -209,7 +242,7 @@ function vm(initState) {
     const template = $template.html()
     const html = compile([], $root, components, directives, { template, scope })
 
-    if (!!update) {
+    if (!!isUpdating) {
       diffAndPatch($root, $('<div />').html(html), true)
     }
     else {
@@ -425,24 +458,6 @@ function vm(initState) {
     actions.length = 0
   }
 
-  let latestHash = null
-  const currTick = () => {
-    if (!latestHash) {
-      latestHash = getObjectHash(state)
-    }
-  }
-  const nextTick = throttle(() => {
-    if (!latestHash) {
-      return
-    }
-    const currentHash = getObjectHash(state)
-    if (latestHash !== currentHash) {
-      change()
-      render(true)
-    }
-    latestHash = null
-  }, 16)
-
   function update(nextState) {
     if (!isMounted) {
       return view
@@ -454,17 +469,20 @@ function vm(initState) {
       return view
     }
 
-    currTick()
+    // 传参的情况下，通过参数修改state来更新
+    if (nextState) {
+      if (isFunction(nextState)) {
+        nextState = nextState(state)
+      }
 
-    if (isFunction(nextState)) {
-      nextState = nextState(state)
+      if (isObject(nextState)) {
+        Object.assign(state, nextState)
+      }
     }
-
-    if (isObject(nextState)) {
-      Object.assign(state, nextState)
+    // 未传参的情况下，检查更新
+    else {
+      nextTick()
     }
-
-    nextTick()
 
     return view
   }
@@ -474,13 +492,8 @@ function vm(initState) {
     const fn = info.pop()
 
     const action = function(e) {
-      currTick()
-
       const handle = fn.call(view, state)
       const res = isFunction(handle) ? handle.call(this, e) : null
-
-      nextTick()
-
       return res
     }
 
