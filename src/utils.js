@@ -45,19 +45,34 @@ export function tryParseJSON(v, callback) {
 export function getPath($element, $root, prefix = []) {
   let $parent = $element.parent()
 
-  const index = [...$parent.children()].findIndex(child => child === $element[0])
+  const findIndex = ($parent, $child) => {
+    const children = $parent[0].childNodes
+    const child = $child[0]
+    let index = 0
+    for (let i = 0, len = children.length; i < len; i ++) {
+      const item = children[i]
+      if (item.nodeName === child.nodeName) {
+        index ++
+      }
+      if (item === child) {
+        return index
+      }
+    }
+  }
+
+  const index = findIndex($parent, $element)
   const name = $element[0].nodeName.toLowerCase()
-  const path = [`${name}:nth-child(${index + 1})`]
+  const path = [`${name}:nth-of-type(${index})`]
 
   let level = 0
   while ($parent[0] !== $root[0]) {
     const $element = $parent
     $parent = $parent.parent()
 
-    const index = [...$parent.children()].findIndex(child => child === $element[0])
+    const index = findIndex($parent, $element)
     const name = $element[0].nodeName.toLowerCase()
 
-    path.unshift(`${name}:nth-child(${index + 1})`)
+    path.unshift(`${name}:nth-of-type(${index})`)
 
     level ++
     if (level > 20) {
@@ -68,3 +83,38 @@ export function getPath($element, $root, prefix = []) {
   const items = [].concat(prefix).concat(path)
   return items.join('>')
 }
+
+// function findByPath($root, selectors) {
+//   // if (parseComments && item.nodeName === '#comment') {
+//   //   const { textContent } = item
+//   //   if (textContent.indexOf(' jq-if=') > 0) {
+//   //     const tag = textContent.trim().split(' ').shift()
+//   //     if (tag === child.nodeName) {
+//   //       index ++
+//   //     }
+//   //   }
+//   //   else if (textContent.indexOf(' jq-repeat=') > 0 && textContent.indexOf(' begin ')) {
+//   //     const tag = textContent.trim().split(' ').shift()
+//   //     i ++
+//   //     let next = children[i]
+//   //     if (next) {
+//   //       if (tag === child.nodeName) {
+//   //         index ++
+//   //       }
+
+//   //       // skip those repeated
+//   //       const [, repeat] = textContent.match()
+//   //       while (next) {
+//   //         if (next.nodeName !== '#comment') {
+//   //           i ++
+//   //           next = children[i]
+//   //         }
+//   //         else if (next.textContent.indexOf(` jq-repeat="${repeat}"`) > 0 && next.textContent.indexOf(' end ')) {
+//   //           i ++
+//   //           break
+//   //         }
+//   //       }
+//   //     }
+//   //   }
+//   // }
+// }

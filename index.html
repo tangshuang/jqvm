@@ -95,6 +95,18 @@
       <button jq-on="click:refresh">refresh (wait for 1s)</button>
     </template>
 
+    <div class="line"></div>
+
+    <template id="component">
+      <div>
+        <div>
+          <span jq-if="show">Use View as a component:</span>
+          <button jq-on="click:toggle">toggle text</button>
+        </div>
+        <my-dog></my-dog>
+      </div>
+    </template>
+
     <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
     <script src="dist/jqvm.js"></script>
 
@@ -184,6 +196,25 @@
         .fn('refresh', state => {
           setTimeout(() => state.content = Date.now(), 1000)
         })
+        .mount()
+
+      const component = $(`
+        <template>
+          <div>name: {{name}}</div>
+          <div>
+            age: {{age}}
+            <button jq-on="click:grow">Grow</button>
+          </div>
+          <div>color: {{color}}</div>
+        </template>
+      `)
+        .vm({ name: 'tidy', age: 1, color: 'white' })
+        .fn('grow', state => state.age ++)
+      window.__testing = true
+      $('#component')
+        .vm({ show: true })
+        .component('my-dog', component)
+        .fn('toggle', state => state.show = !state.show)
         .mount()
     </script>
   </body>

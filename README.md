@@ -317,22 +317,18 @@ The `jq-on` directive should must work with `view.fn`, for example:
 You can invoke `component` to create a new tag.
 
 ```
-component(name:string, compile:function, affect:function)
+component(name:string, view:View)
 ```
 
 - name: the tag name of the component
-- compile($el, attrs): how to compile this component, should return undefined|$el|htmlstring
-- affect($el, attrs): do some side effects after whole template have been compiled, should return a function to abolish side effects, will be invoke after each compilation
+- view: another view created by $.fn.vm
 
 ```js
 const { component } = $.vm
 
-component('icon', function(el, attrs) {
-  // notice the el is a copy from template
-  const { type } = attrs
-  // return new html to render
-  return `<i class="icon icon-${type}"></i>`
-})
+const icon = $(`<i class="icon icon-{{type}}"></i>`).vm({ type: '' })
+
+component('icon', icon)
 ```
 
 Now you can use this `icon` component in template:
@@ -341,6 +337,12 @@ Now you can use this `icon` component in template:
 <template id="app">
   <icon type="search"></icon>
 </template>
+```
+
+When the component rendered, it will use `type="search"` to replace `type` state, so the final html is:
+
+```
+<i class="icon icon-search"></i>
 ```
 
 ## :bread: Filter

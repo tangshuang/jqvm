@@ -1,5 +1,5 @@
 import ScopeX from 'scopex'
-import { isNone, each, isObject, isFunction, isString, diffArray, uniqueArray, getObjectHash, throttle, createReactive } from 'ts-fns'
+import { isNone, each, isObject, isFunction, isString, diffArray, uniqueArray, getObjectHash, createReactive, isEqual, throttle } from 'ts-fns'
 import { createAttrs, getPath } from './utils.js'
 
 let vmId = 0
@@ -63,11 +63,19 @@ const compile = (prefix = [], $root, components, directives, { template, scope }
 
   const $element = $('<div />').html(template)
 
-  const createIterator = (onCompile, affect) => function() {
+  const createIterator = (onCompile, affect, isComponent) => function() {
     const $el = $(this)
     const attrs = createAttrs(this.attributes)
 
     let selectors = []
+
+    // register a view as component
+    if (isComponent && onCompile instanceof View) {
+      selectors = [getPath($el, $element, prefix)]
+      const component = onCompile
+      records.push({ selectors, affect, attrs, component })
+      return
+    }
 
     if (typeof onCompile === 'function') {
       // developers can recompile inside fn
@@ -92,7 +100,7 @@ const compile = (prefix = [], $root, components, directives, { template, scope }
 
   components.forEach(([name, compile, affect]) => {
     const $els = $element.find(name)
-    $els.each(createIterator(compile, affect))
+    $els.each(createIterator(compile, affect, true))
   })
 
   directives.forEach(([name, compile, affect]) => {
@@ -110,12 +118,20 @@ const affect = ($root, scope, view) => {
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   records.forEach((record) => {
-    const { selectors, affect, attrs } = record
+    const { selectors, affect, attrs, component } = record
+
+    if (component) {
+      const $el = $root.find(selectors.join(','))
+      $el[0].__jQvmComponentRoot = true
+      component.mount($el)
+    }
+
     if (typeof affect !== 'function') {
       return
     }
+
     const $el = $root.find(selectors.join(','))
-    const revoke = affect.call({ $root, scope, view }, $el, attrs)
+    const revoke = affect.call({ $root, scope, view, component }, $el, attrs)
     if (typeof revoke === 'function') {
       record.revoke = revoke
     }
@@ -147,18 +163,13 @@ function vm(initState) {
   const directives = Array.from(globalDirectives, directive => [...directive])
   const filters = { ...globalFilters }
 
-  function component(name, affect) {
-    components[name] = affect
+  function component(name, compile, affect) {
+    _push(components, name, compile, affect)
     return view
   }
 
-  function directive(name, affect) {
-    directives.forEach((item, i) => {
-      if (item[0] === name) {
-        directives.splice(i, 1)
-      }
-    })
-    directives.push([name, affect])
+  function directive(name, compile, affect) {
+    _push(directives, name, compile, affect)
     return view
   }
 
@@ -170,31 +181,19 @@ function vm(initState) {
   // ------------
 
   let latestHash = null
-  let nextRunner = null
-  const nextTick = () => {
+  const nextTick = throttle(() => {
     if (!state || !latestHash) {
       return
     }
 
-    const now = Date.now()
-
-    // there is a runner waiting to run
-    if (nextRunner && nextRunner > now) {
-      return
+    const currentHash = getObjectHash(state)
+    if (latestHash !== currentHash) {
+      change()
+      render(true)
     }
 
-    nextRunner = now + 8 // next runner will run after 8ms
-    setTimeout(() => {
-      const currentHash = getObjectHash(state)
-      if (latestHash !== currentHash) {
-        change()
-        render(true)
-      }
-
-      nextRunner = null
-      latestHash = currentHash
-    }, 8)
-  }
+    latestHash = currentHash
+  }, 16)
   const currTick = () => {
     latestHash = getObjectHash(state)
   }
@@ -231,7 +230,6 @@ function vm(initState) {
       actions.forEach((item, i) => {
         const { info, action } = item
         $root.off(...info, action)
-        actions.splice(i, 1)
       })
     })
   }
@@ -285,8 +283,8 @@ function vm(initState) {
     const current = $current[0]
     const next = $next[0]
 
-    const currentAttrs = createAttrs(current.attributes)
-    const nextAttrs = createAttrs(next.attributes)
+    const currentAttrs = createAttrs(current.attributes || [])
+    const nextAttrs = createAttrs(next.attributes || [])
 
     const currentAttrNames = Object.keys(currentAttrs)
     const nextAttrNames = Object.keys(nextAttrs)
@@ -306,7 +304,7 @@ function vm(initState) {
       const diffAttrNames = diffArray(currentAttrNames, nextAttrNames)
       diffAttrNames.forEach((name) => {
         // keep style and class attributes
-        if (name === 'style' || name === 'class') {
+        if (name === 'style' || name === 'class' || name === 'jq-vm') {
           return
         }
         $current.removeAttr(name)
@@ -388,7 +386,17 @@ function vm(initState) {
 
   function mount(el) {
     if (isMounted) {
-      return view
+      if (el) {
+        if (el === mountTo) {
+          return view
+        }
+
+        // when change a new root to mount, unmount the original one
+        view.unmount()
+      }
+      else {
+        return view
+      }
     }
 
     if ($template.next(root).length) {
@@ -400,7 +408,6 @@ function vm(initState) {
     let $root = null
 
     mountTo = el || null // cache mount node
-    isMounted = true
 
     if (el) {
       $root = $(el)
@@ -420,6 +427,8 @@ function vm(initState) {
     render()
     $template.trigger('$mount')
     $root.trigger('$mount')
+
+    isMounted = true
 
     return view
   }
@@ -502,12 +511,27 @@ function vm(initState) {
     const type = once ? 'one' : 'on'
 
     actions.push({ type, info, fn, action })
+
+    if (isMounted) {
+      const $root = getMountNode()
+      $root[type](...info, action)
+    }
   }
 
   function unbind(args) {
-    if (args.length === 1) {
+    if (args.length < 3) {
       const $root = getMountNode()
-      $root.off(...args)
+      actions.forEach((item, i) => {
+        const { info, action } = item
+        if (args.length === 2 && isEqual(info, args)) {
+          $root.off(...info, action)
+          actions.splice(i, 1)
+        }
+        else if (args.length === 1 && info[0] === args[0]) {
+          $root.off(...info, action)
+          actions.splice(i, 1)
+        }
+      })
       return
     }
 
@@ -517,12 +541,10 @@ function vm(initState) {
 
     actions.forEach((item, i) => {
       const { info, action } = item
-      if (fn !== item.fn) {
-        return
+      if (fn === item.fn) {
+        $root.off(...info, action)
+        actions.splice(i, 1)
       }
-
-      $root.off(...info, action)
-      actions.splice(i, 1)
     })
   }
 
@@ -552,7 +574,7 @@ function vm(initState) {
       return view
     },
     off(...args) {
-      unbind(...args)
+      unbind(args)
       return view
     },
     mount,
@@ -616,13 +638,16 @@ directive('jq-repeat', function($el, attrs) {
     $els.push($item)
   })
 
-  $el.replaceWith($els)
+  const $commentBegin = $(`<!-- ${$el[0].nodeName.toLowerCase()} jq-repeat="${attr}" begin -->`)
+  const $commentEnd = $(`<!-- ${$el[0].nodeName.toLowerCase()} jq-repeat="${attr}" end -->`)
+
+  $el.replaceWith([$commentBegin, ...$els, $commentEnd])
 })
 
 directive('jq-if', function($el, attrs) {
   const attr = attrs['jq-if']
   const value = this.scope.parse(attr)
-  return value ? $el : ''
+  return value ? $el : `<!-- ${$el[0].nodeName.toLowerCase()} jq-if="${attr}" (hidden) -->`
 })
 
 directive('jq-id', function($el, attrs) {
