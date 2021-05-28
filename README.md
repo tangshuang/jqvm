@@ -326,7 +326,7 @@ component(name:string, view:View)
 ```js
 const { component } = $.vm
 
-const icon = $(`<i class="icon icon-{{type}}"></i>`).vm({ type: '' })
+const icon = $(`<i class="icon icon-{{type}}"></i>`).vm({ type: 'eye' })
 
 component('icon', icon)
 ```
@@ -343,6 +343,25 @@ When the component rendered, it will use `type="search"` to replace `type` state
 
 ```
 <i class="icon icon-search"></i>
+```
+
+**props**
+
+When you want to pass props into a component, you should know that:
+
+- `type="search"` normal string
+- `:type="'search'"` expression, read from state of current scope
+- `@change="fn"` event callback function, read from functions which registered by `fn`
+
+And, a very important thing: *only those properties on component's state will work (override inner state), others will have no effect, and you have no idea to get them.*. When the value of a property changes, the inner component will rerender with new value. For example:
+
+```js
+const box = $(`...`).vm({ a: 1, b: 2 })
+
+const view = $(`
+  <my-box :a="2" c="xxx"></my-box>
+`).vm({ ... }).component('my-box', box)
+// :a="2" will work, and c="xxx" will not work (has no effect)
 ```
 
 ## :bread: Filter

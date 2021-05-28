@@ -20,7 +20,7 @@
       <section>
         <div jq-if="show">shown</div>
         <div jq-if="!show">hidden</div>
-        <button class="toggle">toggle</button>
+        <button class="toggle btn-{{btnType}}">toggle</button>
       </section>
 
       <section>
@@ -92,7 +92,7 @@
 
     <template id="async">
       <div>{{content}}</div>
-      <button jq-on="click:refresh">refresh (wait for 1s)</button>
+      <button jq-on="click:refresh:1">refresh (wait)</button>
     </template>
 
     <div class="line"></div>
@@ -103,7 +103,8 @@
           <span jq-if="show">Use View as a component:</span>
           <button jq-on="click:toggle">toggle text</button>
         </div>
-        <my-dog></my-dog>
+        <div>color: {{color}}</div>
+        <my-dog name="lisa" :age="4" @change="change"></my-dog>
       </div>
     </template>
 
@@ -118,6 +119,7 @@
 
       $('#app')
         .vm({
+          btnType: 'test',
           show: true,
           title: 'This is title text!',
           text: 'This is a long text, \nwhich has break wrodk',
@@ -193,8 +195,8 @@
 
       $('#async')
         .vm({ content: 'init' })
-        .fn('refresh', state => {
-          setTimeout(() => state.content = Date.now(), 1000)
+        .fn('refresh', (state, delay) => {
+          setTimeout(() => state.content = Date.now(), 1000 * +delay)
         })
         .mount()
 
@@ -206,15 +208,23 @@
             <button jq-on="click:grow">Grow</button>
           </div>
           <div>color: {{color}}</div>
+          <div><button jq-on="click:change">emit</button></div>
         </template>
       `)
         .vm({ name: 'tidy', age: 1, color: 'white' })
         .fn('grow', state => state.age ++)
+        .fn('change', function(state) {
+          const color = ['blue', 'yellow', 'red', 'white'].filter(item => item !== state.color)[parseInt(Math.random() * 100) % 3]
+          this.emit('change', color)
+        })
       window.__testing = true
       $('#component')
-        .vm({ show: true })
+        .vm({ show: true, color: 'none' })
         .component('my-dog', component)
         .fn('toggle', state => state.show = !state.show)
+        .fn('change', (state, color) => {
+          state.color = color
+        })
         .mount()
     </script>
   </body>

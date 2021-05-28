@@ -118,3 +118,14 @@ export function getPath($element, $root, prefix = []) {
 //   //   }
 //   // }
 // }
+
+export function camelCase(str) {
+  const items = str.split(/\W|_/).filter(item => !!item)
+  const texts = items.map((item, i) => {
+    if (i === 0) {
+      return item
+    }
+    return item.replace(item[0], item[0].toUpperCase())
+  })
+  return texts.join('')
+}

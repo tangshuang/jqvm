@@ -1,10 +1,13 @@
 import ScopeX from 'scopex'
-import { isNone, each, isObject, isFunction, isString, diffArray, uniqueArray, getObjectHash, createReactive, isEqual, throttle } from 'ts-fns'
-import { createAttrs, getPath } from './utils.js'
+import { isNone, each, isObject, isFunction, isString,
+  diffArray, uniqueArray, getObjectHash, createReactive,
+  isEqual, throttle, filter as filterProps, isShallowEqual } from 'ts-fns'
+import { createAttrs, getPath, camelCase } from './utils.js'
 
 let vmId = 0
 let $ = null
 function View() {}
+const SYMBOL = {}
 
 // ---------------
 
@@ -57,7 +60,7 @@ const prepare = ($root) => {
   records.length = 0
 }
 
-const compile = (prefix = [], $root, components, directives, { template, scope }) => {
+const compile = (prefix = [], $root, components, directives, state, { template, scope }) => {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
@@ -73,7 +76,7 @@ const compile = (prefix = [], $root, components, directives, { template, scope }
     if (isComponent && onCompile instanceof View) {
       selectors = [getPath($el, $element, prefix)]
       const component = onCompile
-      records.push({ selectors, affect, attrs, component })
+      records.push({ selectors, affect, attrs, component, state })
       return
     }
 
@@ -82,7 +85,7 @@ const compile = (prefix = [], $root, components, directives, { template, scope }
       const parentPath = getPath($el.parent(), $element, prefix)
       const context = {
         scope,
-        compile: compile.bind(null, parentPath, $root, components, directives),
+        compile: compile.bind(null, parentPath, $root, components, directives, state),
       }
       const output = onCompile.call(context, $el, attrs)
       if (!isNone(output) && $el !== output) {
@@ -118,12 +121,32 @@ const affect = ($root, scope, view) => {
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   records.forEach((record) => {
-    const { selectors, affect, attrs, component } = record
+    const { selectors, affect, attrs, component, state } = record
 
     if (component) {
       const $el = $root.find(selectors.join(','))
-      $el[0].__jQvmComponentRoot = true
-      component.mount($el)
+      const outside = {}
+      each(attrs, (exp, attr) => {
+        if (attr.indexOf(':') === 0) {
+          const value = scope.parse(exp)
+          const key = camelCase(attr.substring(1))
+          outside[key] = value
+        }
+        else if (attr.indexOf('@') === 0) {
+          const fn = view.fn(exp)
+          const event = camelCase(attr.substring(1))
+          outside[event] = (...args) => fn.call(view, state, ...args)
+        }
+        else {
+          const key = camelCase(attr)
+          outside[key] = exp
+        }
+      })
+      component.update(outside, SYMBOL)
+      if (!$el[0].__jQvmComponentRoot) {
+        $el[0].__jQvmComponentRoot = true
+        component.mount($el)
+      }
     }
 
     if (typeof affect !== 'function') {
@@ -147,6 +170,7 @@ function vm(initState) {
 
   let state = null
   let scope = null
+  let outside = null
 
   let mountTo = null
   let isMounted = false
@@ -200,6 +224,25 @@ function vm(initState) {
 
   // -------------
 
+  const assignOutsideState = (state, outsideState, init) => {
+    const next = filterProps(outsideState, (value, key) => {
+      if (!state) {
+        return false
+      }
+      if (!(key in state)) {
+        return false
+      }
+      if (init) {
+        return true
+      }
+      if (outside && isShallowEqual(outside[key], value)) {
+        return false
+      }
+      return true
+    })
+    Object.assign(state, next)
+  }
+
   function init(initState) {
     if (isFunction(initState)) {
       initState = initState.call(view)
@@ -209,10 +252,14 @@ function vm(initState) {
       throw new Error('initState should must be an object')
     }
 
+    if (outside) {
+      assignOutsideState(initState, outside, true)
+    }
+
     state = createReactive(initState, {
       dispatch: nextTick,
     })
-    scope = new ScopeX(state, { filters, loose: true })
+    scope = new ScopeX(state, { filters })
     currTick()
   }
 
@@ -240,7 +287,7 @@ function vm(initState) {
     prepare($root)
 
     const template = $template.html()
-    const html = compile([], $root, components, directives, { template, scope })
+    const html = compile([], $root, components, directives, state, { template, scope })
 
     if (!!isUpdating) {
       diffAndPatch($root, $('<div />').html(html), true)
@@ -309,6 +356,11 @@ function vm(initState) {
         }
         $current.removeAttr(name)
       })
+    }
+
+    // dont diff inner component
+    if (current.__jQvmComponentRoot && current.nodeName === next.nodeName) {
+      return
     }
 
     const currentChildren = [...current.childNodes]
@@ -469,7 +521,18 @@ function vm(initState) {
     actions.length = 0
   }
 
-  function update(nextState) {
+  function update(nextState, isOutside) {
+    if (isOutside === SYMBOL) {
+      if (isMounted) {
+        assignOutsideState(state, outside)
+        outside = nextState
+      }
+      else {
+        outside = nextState
+      }
+      return
+    }
+
     if (!isMounted) {
       return view
     }
@@ -553,6 +616,17 @@ function vm(initState) {
     return $root.find(selector)
   }
 
+  function emit(event, ...args) {
+    if (!outside) {
+      return
+    }
+    const fn = outside[event]
+    if (!isFunction(fn)) {
+      return
+    }
+    fn(...args)
+  }
+
   const fns = {}
   function fn(name, action) {
     if (!action) {
@@ -577,6 +651,7 @@ function vm(initState) {
       unbind(args)
       return view
     },
+    emit,
     mount,
     unmount,
     destroy,
@@ -605,7 +680,7 @@ directive('jq-repeat', function($el, attrs) {
   const [kv, , dataKey, , traceBy] = attr.split(' ')
   const [valueName, keyName] = kv.split(',')
 
-  const { scope: parentScope, compile, view } = this
+  const { scope: parentScope, compile } = this
   const data = parentScope.parse(dataKey)
 
   // make it not be able to compile again
@@ -624,7 +699,7 @@ directive('jq-repeat', function($el, attrs) {
     }
     const scope = parentScope.$new(newScope)
 
-    const result = compile({ template, scope, view })
+    const result = compile({ template, scope })
     const html = scope.interpolate(result)
     const $item = $(html)
 
@@ -729,17 +804,25 @@ directive('jq-src', null, function($el, attrs) {
 
 directive('jq-on', null, function($el, attrs) {
   const attr = attrs['jq-on']
-  const [event, name] = attr.split(':')
+  const [event, name, args] = attr.split(':')
 
-  const { view, $root } = this
+  const { view, $root, scope } = this
   const fn = view.fn(name)
   if (!fn) {
     return
   }
 
+  let f = fn
+  if (args) {
+    const params = args.split(',').map(arg => scope.parse(arg))
+    f = function(state) {
+      return fn.call(this, state, ...params)
+    }
+  }
+
   const path = getPath($el, $root)
-  view.on(event, path, fn)
-  return () => view.off(event, path, fn)
+  view.on(event, path, f)
+  return () => view.off(event, path, f)
 })
 
 // --------------------------------
