@@ -45,6 +45,10 @@ export function tryParseJSON(v, callback) {
 export function getPath($element, $root, prefix = []) {
   let $parent = $element.parent()
 
+  if (!$parent.length) {
+    return []
+  }
+
   const findIndex = ($parent, $child) => {
     const children = $parent[0].childNodes
     const child = $child[0]

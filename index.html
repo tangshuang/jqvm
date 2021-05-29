@@ -99,13 +99,11 @@
 
     <template id="component">
       <div>
-        <div>
-          <span jq-if="show">Use View as a component:</span>
-          <button jq-on="click:toggle">toggle text</button>
-        </div>
-        <div>color: {{color}}</div>
-        <my-dog name="lisa" :age="4" @change="change"></my-dog>
+        <span jq-if="show">Use View as a component:</span>
+        <button jq-on="click:toggle">toggle text</button>
       </div>
+      <div>color: {{color}}</div>
+      <my-dog name="lisa" :age="4" @change="change"></my-dog>
     </template>
 
     <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
@@ -226,6 +224,26 @@
           state.color = color
         })
         .mount()
+    </script>
+
+    <div class="line"></div>
+
+    <template id="missing-path-test">
+      <div jq-if="!src">loading</div>
+      <img jq-src="src" jq-if="!src" />
+      <img jq-src="src" jq-if="src" />
+    </template>
+
+    <script>
+      $('#missing-path-test').vm({
+        src: '',
+      })
+      .on('$mount', state => {
+        setTimeout(() => {
+          state.src = 'https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/510063b180ff4ca5a30fb86e79d15f50~tplv-k3u1fbpfcp-watermark.image'
+        }, 3000)
+      })
+      .mount()
     </script>
   </body>
 </html>

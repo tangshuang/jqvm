@@ -384,7 +384,7 @@ function vm(initState) {
       const $next = $(next)
       const current = parentNode.childNodes[i]
       const $current = $(current)
-      const nextId = $next.attr('jq-id')
+      const nextId = $next.attr('id')
 
       // current index node not existing, insert the coming node directly
       if (!current) {
@@ -392,7 +392,7 @@ function vm(initState) {
       }
       // move exist element, use `jq-id` to unique element
       else if (nextId) {
-        const $prev = $parent.find(`[jq-id=${nextId}]`)
+        const $prev = $parent.find(`[id=${nextId}]`)
         if ($prev.length) {
           const prev = $prev[0]
           // move it
@@ -707,7 +707,7 @@ directive('jq-repeat', function($el, attrs) {
     $item.attr('jq-repeat', attr)
     if (traceBy) {
       const traceId = scope.parse(traceBy)
-      $item.attr('jq-id', traceId)
+      $item.attr('data-id', traceId)
     }
 
     $els.push($item)
@@ -727,8 +727,8 @@ directive('jq-if', function($el, attrs) {
 
 directive('jq-id', function($el, attrs) {
   const attr = attrs['jq-id']
-  const value = this.scope.interpolate(attr)
-  $el.attr('jq-id', value)
+  const value = this.scope.parse(attr)
+  $el.attr('id', value)
 })
 
 directive('jq-class', function($el, attrs) {
@@ -798,7 +798,7 @@ directive(
 
 directive('jq-src', null, function($el, attrs) {
   const attr = attrs['jq-src']
-  const value = this.scope.interpolate(attr)
+  const value = this.scope.parse(attr)
   $el.attr('src', value)
 })
 
