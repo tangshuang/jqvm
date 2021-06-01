@@ -340,10 +340,13 @@ component(name:string, view:View)
 ```js
 const { component } = $.vm
 
-const icon = $(`<i class="icon icon-{{type}}"></i>`).vm({ type: 'eye' })
+const icon = $(`<i class="icon icon-{{type}}"></i>`)
+  .vm(() => ({ type: 'eye' })) // notice here, you should use a function to return initState
 
 component('icon', icon)
 ```
+
+You should use a function to return initState, so that the state of component is alone.
 
 Now you can use this `icon` component in template:
 
@@ -373,8 +376,10 @@ And, a very important thing: *only those properties on component's state will wo
 const box = $(`...`).vm({ a: 1, b: 2 })
 
 const view = $(`
-  <my-box :a="2" c="xxx"></my-box>
-`).vm({ ... }).component('my-box', box)
+  <my-box :a="2" c="xxx" @change="change(a,b)"></my-box>
+`)
+  .vm(() => ({ ... }))
+  .component('my-box', box)
 // :a="2" will work, and c="xxx" will not work (has no effect)
 ```
 
@@ -383,7 +388,7 @@ const view = $(`
 Inside a component (sepcial view), you should call `view.emit` to emit a event. For example:
 
 ```js
-$(...).vm(...)
+$(...).vm(() => ({ ... }))
   .fn('change', function(state) {
     return (e) => this.emit('change', e) // this -> view, emit is only in view instance
   })

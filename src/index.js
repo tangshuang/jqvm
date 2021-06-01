@@ -1,7 +1,9 @@
 import ScopeX from 'scopex'
-import { isNone, each, isObject, isFunction, isString,
+import {
+  isNone, each, isObject, isFunction, isString,
   diffArray, uniqueArray, getObjectHash, createReactive,
-  isEqual, throttle, filter as filterProps, isShallowEqual } from 'ts-fns'
+  isEqual, throttle, filter as filterProps, isShallowEqual,
+} from 'ts-fns'
 import { createAttrs, getPath, camelCase, parseKey } from './utils.js'
 
 let vmId = 0
@@ -75,7 +77,7 @@ const compile = (prefix = [], $root, components, directives, state, { template, 
     // register a view as component
     if (isComponent && onCompile instanceof View) {
       selectors = [getPath($el, $element, prefix)]
-      const component = onCompile
+      const component = onCompile.clone()
       records.push({ selectors, affect, attrs, component, state })
       return
     }
@@ -196,8 +198,8 @@ function vm(initState) {
 
   // -----------
 
-  const components = Array.from(globalComponents, component => [...component])
-  const directives = Array.from(globalDirectives, directive => [...directive])
+  const components = [...globalComponents]
+  const directives = [...globalDirectives]
   const filters = { ...globalFilters }
 
   function component(name, compile, affect) {
@@ -257,19 +259,17 @@ function vm(initState) {
   }
 
   function init(initState) {
-    if (isFunction(initState)) {
-      initState = initState.call(view)
-    }
+    const next = isFunction(initState) ? initState.call(view) : initState
 
-    if (!initState || typeof initState !== 'object') {
+    if (!next || typeof next !== 'object') {
       throw new Error('initState should must be an object')
     }
 
     if (outside) {
-      assignOutsideState(initState, outside, true)
+      assignOutsideState(next, outside, true)
     }
 
-    state = createReactive(initState, {
+    state = createReactive(next, {
       dispatch: nextTick,
     })
     scope = new ScopeX(state, { filters })
@@ -651,6 +651,34 @@ function vm(initState) {
     return view
   }
 
+  const clone = () => {
+    const view = vm.call(this, initState)
+    each(fns, (action, name) => {
+      view.fn(name, action)
+    })
+    each(actions, (item) => {
+      const { type, info, fn } = item
+      const m = type === 'one' ? 'once' : 'on'
+      view[m](...info, fn)
+    })
+    each(components, (item) => {
+      if (globalComponents.includes(item)) {
+        return
+      }
+      view.component(...item)
+    })
+    each(directives, (item) => {
+      if (globalDirectives.includes(item)) {
+        return
+      }
+      view.directive(...item)
+    })
+    each(filters, (fn, name) => {
+      view.filter(name, fn)
+    })
+    return view
+  }
+
   Object.assign(view, {
     once(...args) {
       bind(args, true)
@@ -674,6 +702,7 @@ function vm(initState) {
     directive,
     filter,
     fn,
+    clone,
   })
 
   listen()

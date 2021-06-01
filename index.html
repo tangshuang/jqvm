@@ -209,13 +209,12 @@
           <div><button jq-on="click:change">emit</button></div>
         </template>
       `)
-        .vm({ name: 'tidy', age: 1, color: 'white' })
+        .vm(() => ({ name: 'tidy', age: 1, color: 'white' }))
         .fn('grow', state => state.age ++)
         .fn('change', function(state) {
           const color = ['blue', 'yellow', 'red', 'white'].filter(item => item !== state.color)[parseInt(Math.random() * 100) % 3]
           this.emit('change', color)
         })
-      window.__testing = true
       $('#component')
         .vm({ show: true, color: 'none' })
         .component('my-dog', component)
