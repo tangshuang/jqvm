@@ -365,7 +365,7 @@ When you want to pass props into a component, you should know that:
 
 - `type="search"` normal string
 - `:type="'search'"` expression, read from state of current scope
-- `@change="fn"` event callback function, read from functions which registered by `fn`
+- `@change="fn"` emitter handler function, read from functions which registered by `fn`
 
 And, a very important thing: *only those properties on component's state will work (override inner state), others will have no effect, and you have no idea to get them.*. When the value of a property changes, the inner component will rerender with new value. For example:
 
@@ -377,6 +377,33 @@ const view = $(`
 `).vm({ ... }).component('my-box', box)
 // :a="2" will work, and c="xxx" will not work (has no effect)
 ```
+
+**emitter**
+
+Inside a component (sepcial view), you should call `view.emit` to emit a event. For example:
+
+```js
+$(...).vm(...)
+  .fn('change', function(state) {
+    return (e) => this.emit('change', e) // this -> view, emit is only in view instance
+  })
+```
+
+Usage:
+
+```js
+this.emit(event, ...args)
+```
+
+Then you can receive the event outside:
+
+```html
+<my-component @change="fn_change">
+```
+
+The handler function is an `action` function as metioned.
+
+Notice: component emitter is different from `jq-on` event. `jq-on` event is refer to DOM Event system, component emitter is just refer to a custom subscriber system.
 
 ## :bread: Filter
 
