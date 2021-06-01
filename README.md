@@ -153,7 +153,8 @@ Now, let's look into `action` detail.
 ```js
 // a function which return a inner function
 // state: the current state in vm
-function action(state) {
+// ...args: those bind on fn in template
+function action(state, ...args) {
   const view = this // you can do like `view.unmount()`
 
   state.some = 'next' // `some` should be exisiting in state, and this will trigger rerendering later
@@ -171,6 +172,19 @@ function action(state) {
 }
 
 view.on('click', '.some', action)
+```
+
+No matter you use `fn` in view or to a component by `@`, the `action` function is the same structure.
+
+```
+<my-component @change="change(bindVar1, bindVar2)"></my-component>
+
+<script>
+$(...).vm(...).fn('change', (state, bindVar1, bindVar2) => (...args) => {
+  // bindVar1, bindVar2 is from template
+  // ...args is from inside component `this.emit`
+})
+</script>
 ```
 
 Inside events:

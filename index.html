@@ -92,7 +92,7 @@
 
     <template id="async">
       <div>{{content}}</div>
-      <button jq-on="click:refresh:1">refresh (wait)</button>
+      <button jq-on="click:refresh(2)">refresh (wait)</button>
     </template>
 
     <div class="line"></div>
@@ -103,7 +103,7 @@
         <button jq-on="click:toggle">toggle text</button>
       </div>
       <div>color: {{color}}</div>
-      <my-dog name="lisa" :age="4" @change="change"></my-dog>
+      <my-dog name="lisa" :age="4" @change="change(4)"></my-dog>
     </template>
 
     <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script>
@@ -220,7 +220,8 @@
         .vm({ show: true, color: 'none' })
         .component('my-dog', component)
         .fn('toggle', state => state.show = !state.show)
-        .fn('change', (state, color) => {
+        .fn('change', (state, age) => (color) => {
+          console.log(age)
           state.color = color
         })
         .mount()

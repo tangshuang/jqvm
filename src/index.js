@@ -2,7 +2,7 @@ import ScopeX from 'scopex'
 import { isNone, each, isObject, isFunction, isString,
   diffArray, uniqueArray, getObjectHash, createReactive,
   isEqual, throttle, filter as filterProps, isShallowEqual } from 'ts-fns'
-import { createAttrs, getPath, camelCase } from './utils.js'
+import { createAttrs, getPath, camelCase, parseKey } from './utils.js'
 
 let vmId = 0
 let $ = null
@@ -133,9 +133,22 @@ const affect = ($root, scope, view) => {
           outside[key] = value
         }
         else if (attr.indexOf('@') === 0) {
-          const fn = view.fn(exp)
           const event = camelCase(attr.substring(1))
-          outside[event] = (...args) => fn.call(view, state, ...args)
+          const [name, params] = parseKey(exp)
+          const fn = view.fn(name)
+          outside[event] = (...args) => {
+            let res = null
+            if (params) {
+              const args = params.map(arg => scope.parse(arg))
+              res = fn.call(view, state, ...args)
+            }
+            else {
+              res = fn.call(view, state)
+            }
+            if (isFunction(res)) {
+              res.apply(null, args)
+            }
+          }
         }
         else {
           const key = camelCase(attr)
@@ -804,7 +817,8 @@ directive('jq-src', null, function($el, attrs) {
 
 directive('jq-on', null, function($el, attrs) {
   const attr = attrs['jq-on']
-  const [event, name, args] = attr.split(':')
+  const [event, method] = attr.split(':')
+  const [name, params] = parseKey(method)
 
   const { view, $root, scope } = this
   const fn = view.fn(name)
@@ -813,10 +827,10 @@ directive('jq-on', null, function($el, attrs) {
   }
 
   let f = fn
-  if (args) {
-    const params = args.split(',').map(arg => scope.parse(arg))
+  if (params) {
+    const args = params.map(arg => scope.parse(arg))
     f = function(state) {
-      return fn.call(this, state, ...params)
+      return fn.call(this, state, ...args)
     }
   }
 

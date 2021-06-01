@@ -1,3 +1,5 @@
+import { isString } from 'ts-fns'
+
 export function getOuterHTML(el) {
   const nodeName = el.nodeName.toLowerCase()
   const attrs = [...el.attributes].map((a) => {
@@ -132,4 +134,16 @@ export function camelCase(str) {
     return item.replace(item[0], item[0].toUpperCase())
   })
   return texts.join('')
+}
+
+export function parseKey(str) {
+  const matched = str.match(/([a-zA-Z0-9_$]+)(\((.*?)\))?/)
+  const [, name, , _params] = matched
+  const params = isString(_params)
+    ? _params
+      .split(',')
+      .map(item => item.trim())
+      .filter(item => !!item)
+    : void 0
+  return [name, params]
 }
