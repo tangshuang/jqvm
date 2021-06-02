@@ -65,7 +65,10 @@
       </section>
 
       <section>
-        <div jq-repeat="item,index in items traceby item.name">{{item.name}}</div>
+        <div jq-repeat="item,index in items traceby item.name">
+          <span>{{index}}</span>
+          <span>{{item.name}}</span>
+        </div>
       </section>
 
       <section>

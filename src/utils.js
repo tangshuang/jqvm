@@ -24,7 +24,7 @@ export function getAttrs(el) {
   }))
 }
 
-export function createAttrs(attributes) {
+export function createAttrs(attributes = []) {
   const oAttrs = Array.from(attributes)
   const attrs = {}
   oAttrs.forEach((node) => {

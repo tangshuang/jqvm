@@ -62,45 +62,45 @@ const prepare = ($root) => {
   records.length = 0
 }
 
-const compile = (prefix = [], $root, components, directives, state, { template, scope }) => {
+const compile = ($root, components, directives, state, { template, scope }) => {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   const $element = $('<div />').html(template)
 
   const createIterator = (onCompile, affect, isComponent) => function() {
-    const $el = $(this)
+    const el = this
+    const $el = $(el)
     const attrs = createAttrs(this.attributes)
 
-    let selectors = []
+    let els = [el]
 
     // register a view as component
     if (isComponent && onCompile instanceof View) {
-      selectors = [getPath($el, $element, prefix)]
       const component = onCompile.clone()
-      records.push({ selectors, affect, attrs, component, state })
+      const record = { affect, attrs, component, state, els }
+      els.forEach(el => el.__jQvmCompiledRecord = record)
+      records.push(record)
       return
     }
 
     if (typeof onCompile === 'function') {
       // developers can recompile inside fn
-      const parentPath = getPath($el.parent(), $element, prefix)
       const context = {
         scope,
-        compile: compile.bind(null, parentPath, $root, components, directives, state),
+        compile: compile.bind(null, $root, components, directives, state),
       }
       const output = onCompile.call(context, $el, attrs)
       if (!isNone(output) && $el !== output) {
         const $newEls = $(output)
         $el.replaceWith($newEls)
-        selectors = [...$newEls].map(el => getPath($(el), $element, prefix))
+        els = [...$newEls]
       }
     }
-    else {
-      selectors = [getPath($el, $element, prefix)]
-    }
 
-    records.push({ selectors, affect, attrs })
+    const record = { affect, attrs, els }
+    records.push(record)
+    els.forEach(el => el.__jQvmCompiledRecord = record)
   }
 
   components.forEach(([name, compile, affect]) => {
@@ -113,9 +113,33 @@ const compile = (prefix = [], $root, components, directives, state, { template, 
     $els.each(createIterator(compile, affect))
   })
 
-  const innerHTML = $element.html()
-  const result = scope.interpolate(innerHTML)
-  return result
+  const interpolate = ($element) => {
+    $element.each(function() {
+      const attrs = [...this.attributes]
+      const $this = $(this)
+      attrs.forEach(({ name, value }) => {
+        // HTML standard not allow @attr
+        if (name.indexOf('@') === 0) {
+          return
+        }
+        const text = scope.interpolate(value)
+        $this.attr(name, text)
+      })
+
+      const children = [...this.childNodes]
+      children.forEach((child) => {
+        if (child.nodeName === '#text') {
+          child.textContent = scope.interpolate(child.textContent)
+        }
+        else if (child.nodeName.indexOf('#') !== 0) {
+          interpolate($(child))
+        }
+      })
+    })
+  }
+  interpolate($element)
+
+  return $element[0].childNodes
 }
 
 const affect = ($root, scope, view) => {
@@ -123,56 +147,68 @@ const affect = ($root, scope, view) => {
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   records.forEach((record) => {
-    const { selectors, affect, attrs, component, state } = record
+    const { affect, attrs, component, state, els } = record
 
     if (component) {
-      const $el = $root.find(selectors.join(','))
-      const outside = {}
-      each(attrs, (exp, attr) => {
-        if (attr.indexOf(':') === 0) {
-          const value = scope.parse(exp)
-          const key = camelCase(attr.substring(1))
-          outside[key] = value
-        }
-        else if (attr.indexOf('@') === 0) {
-          const event = camelCase(attr.substring(1))
-          const [name, params] = parseKey(exp)
-          const fn = view.fn(name)
-          outside[event] = (...args) => {
-            let res = null
-            if (params) {
-              const args = params.map(arg => scope.parse(arg))
-              res = fn.call(view, state, ...args)
-            }
-            else {
-              res = fn.call(view, state)
-            }
-            if (isFunction(res)) {
-              res.apply(null, args)
+      els.forEach((el) => {
+        const $el = $(el)
+        const outside = {}
+        each(attrs, (exp, attr) => {
+          if (attr.indexOf(':') === 0) {
+            const value = scope.parse(exp)
+            const key = camelCase(attr.substring(1))
+            outside[key] = value
+          }
+          else if (attr.indexOf('@') === 0) {
+            const event = camelCase(attr.substring(1))
+            const [name, params] = parseKey(exp)
+            const fn = view.fn(name)
+            outside[event] = (...args) => {
+              let res = null
+              if (params) {
+                const args = params.map(arg => scope.parse(arg))
+                res = fn.call(view, state, ...args)
+              }
+              else {
+                res = fn.call(view, state)
+              }
+              if (isFunction(res)) {
+                res.apply(null, args)
+              }
             }
           }
+          else {
+            const key = camelCase(attr)
+            outside[key] = exp
+          }
+        })
+        component.update(outside, SYMBOL)
+        if (!$el[0].__jQvmComponentRoot) {
+          $el[0].__jQvmComponentRoot = true
+          component.mount($el)
         }
-        else {
-          const key = camelCase(attr)
-          outside[key] = exp
-        }
+
+        // let attrs has the result so that we can use them in effects
+        attrs.$attrs = outside
       })
-      component.update(outside, SYMBOL)
-      if (!$el[0].__jQvmComponentRoot) {
-        $el[0].__jQvmComponentRoot = true
-        component.mount($el)
-      }
+
+      // remove no use info
+      els.forEach((el) => {
+        delete el.__jQvmCompiledRecord
+      })
     }
 
     if (typeof affect !== 'function') {
       return
     }
 
-    const $el = $root.find(selectors.join(','))
-    const revoke = affect.call({ $root, scope, view, component }, $el, attrs)
-    if (typeof revoke === 'function') {
-      record.revoke = revoke
-    }
+    els.forEach((el) => {
+      const $el = $(el)
+      const revoke = affect.call({ $root, scope, view, component }, $el, attrs)
+      if (typeof revoke === 'function') {
+        record.revoke = revoke
+      }
+    })
   })
 }
 
@@ -300,13 +336,13 @@ function vm(initState) {
     prepare($root)
 
     const template = $template.html()
-    const html = compile([], $root, components, directives, state, { template, scope })
+    const nodes = compile($root, components, directives, state, { template, scope })
 
     if (!!isUpdating) {
-      diffAndPatch($root, $('<div />').html(html), true)
+      diffAndPatch($root, $('<div />').html(nodes), true)
     }
     else {
-      $root.html(html)
+      $root.html(nodes)
     }
 
     affect($root, scope, view)
@@ -337,6 +373,22 @@ function vm(initState) {
     }
 
     $root.trigger('$render')
+  }
+
+  // we will not use next to replace current node, so we should transform record info to old node
+  const transferRecord = (current, next) => {
+    const record = next.__jQvmCompiledRecord
+    if (!record) {
+      return
+    }
+
+    const { els } = record
+    els.forEach((el, i) => {
+      if (el === next) {
+        els[i] = current
+      }
+    })
+    current.__jQvmCompiledRecord = record
   }
 
   function diffAndPatch($current, $next, top) {
@@ -371,7 +423,9 @@ function vm(initState) {
       })
     }
 
-    // dont diff inner component
+    transferRecord(current, next)
+
+    // dont diff component inner content
     if (current.__jQvmComponentRoot && current.nodeName === next.nodeName) {
       return
     }
@@ -403,7 +457,7 @@ function vm(initState) {
       if (!current) {
         parentNode.insertBefore(next, current)
       }
-      // move exist element, use `jq-id` to unique element
+      // use `jq-id` to unique element
       else if (nextId) {
         const $prev = $parent.find(`[id=${nextId}]`)
         if ($prev.length) {
@@ -411,6 +465,7 @@ function vm(initState) {
           // move it
           if (prev !== current) {
             parentNode.insertBefore(prev, current)
+            transferRecord(current, next)
           }
           // update the node
           diffAndPatch($prev, $next)
@@ -426,6 +481,7 @@ function vm(initState) {
       // diff and patch element
       else if (next.nodeName !== '#text') {
         diffAndPatch($current, $next)
+        transferRecord(current, next)
       }
       // diff and patch text
       else {
@@ -727,7 +783,9 @@ directive('jq-repeat', function($el, attrs) {
 
   // make it not be able to compile again
   $el.removeAttr('jq-repeat')
-  $el.attr('x-jq-repeat', attr)
+  if (traceBy) {
+    $el.attr('data-id', `{{${traceBy}}}`)
+  }
 
   const template = $el[0].outerHTML
   const $els = []
@@ -741,18 +799,8 @@ directive('jq-repeat', function($el, attrs) {
     }
     const scope = parentScope.$new(newScope)
 
-    const result = compile({ template, scope })
-    const html = scope.interpolate(result)
-    const $item = $(html)
-
-    $item.removeAttr('x-jq-repeat')
-    $item.attr('jq-repeat', attr)
-    if (traceBy) {
-      const traceId = scope.parse(traceBy)
-      $item.attr('data-id', traceId)
-    }
-
-    $els.push($item)
+    const nodes = compile({ template, scope })
+    $els.push(nodes)
   })
 
   const $commentBegin = $(`<!-- ${$el[0].nodeName.toLowerCase()} jq-repeat="${attr}" begin -->`)
