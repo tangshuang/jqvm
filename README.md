@@ -12,6 +12,8 @@
 <br />
 <br />
 
+<center> [中文文档](./README_zh.md) | [English](./README.md) </center>
+
 ## :hear_no_evil:  What's all the jQvm?
 
 JQvm is a library, a jQuery plugin, a frontend reactive view-model framework, which helps JavasScript developers who are familiar with jQuery code more quickly. Boring with React, Vue? Want to taste reactive programming in frontend? Believe me, if you have learned jQuery, you can setup a small application in 10 seconds!
@@ -121,12 +123,13 @@ JQVM will treat html string in #app as template, so, it is recommended to use `t
 
 The return value is a `view` object which has methods:
 
-- on(events, selector?, action): bind an action, notice that action function is different from jQuery.fn.on callback function, I will detail later
-- off(events, selector?, action?): unbind listener which is bound by `on`
+- on(event, selector?, action): bind an action, notice that action function is different from jQuery.fn.on callback function, I will detail later
+- once(event, selector?, action): refer to jQuery's `one`
+- off(event, selector?, action?): unbind listener which is bound by `on`
 - mount(el?): mount view into DOM
 - unmount(): unmount view from DOM, `vm` is unusable until you invoke `mount` again
 - destroy(): unmount and clear bound actions, after you destroy, you can mount again, but actions should be bound again
-- update(nextState): rerender, you can pass new state into `update()`, the new state will be merge into old state like react setState does.
+- update(nextState?): rerender, you can pass new state into `update()`, the new state will be merge into old state like react setState does.
 - find(selector): same as `$.fn.find`, select elements in view container
 - component(name, compile, affect): register component only for this vm
 - directive(name, compile, affect): register directive only for this vm
