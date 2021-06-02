@@ -12,7 +12,7 @@
 <br />
 <br />
 
-<center> [中文文档](./README_zh.md) | [English](./README.md) </center>
+<p align="center">[中文文档](./README_zh.md) | [English](./README.md)</p>
 
 ## :hear_no_evil:  What's all the jQvm?
 
