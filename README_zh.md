@@ -12,7 +12,8 @@
 <br />
 <br />
 
-<p align="center">[中文文档](./README_zh.md) | [English](./README.md)</p>
+[中文文档](./README_zh.md)
+[English](./README.md)
 
 ## :hear_no_evil:  什么是jQvm?
 
