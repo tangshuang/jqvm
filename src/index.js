@@ -68,7 +68,7 @@ const compile = ($root, components, directives, state, { template, scope }) => {
 
   const $element = $('<div />').html(template)
 
-  const createIterator = (onCompile, affect, isComponent) => function() {
+  const createIterator = (onCompile, affect, isComp) => function() {
     const el = this
     const $el = $(el)
     const attrs = createAttrs(this.attributes)
@@ -76,7 +76,7 @@ const compile = ($root, components, directives, state, { template, scope }) => {
     let els = [el]
 
     // register a view as component
-    if (isComponent && onCompile instanceof View) {
+    if (isComp && onCompile instanceof View) {
       const component = onCompile.clone()
       const record = { affect, attrs, component, state, els }
       els.forEach(el => el.__jQvmCompiledRecord = record)
@@ -333,9 +333,29 @@ function vm(initState) {
   }
 
   function render(isUpdating) {
-    const $root = getMountNode()
+    let $root = getMountNode()
 
     prepare($root)
+
+    // i.e. $(`<span>xxx</span>`)
+    const tagName = $template[0].nodeName.toLowerCase()
+    const isHoist = !$(document).find($template).length && tagName !== 'template'
+    // when create at first time
+    if (isHoist && !isUpdating) {
+      const hoistName = $root[0].nodeName.toLowerCase()
+      console.log(hoistName)
+      const $hoist = $(`<${tagName} />`)
+      const attributes = $template[0].attributes || []
+      const attrs = [...attributes]
+      attrs.forEach(({ name, value}) => {
+        $hoist.attr(name, value)
+      })
+      $hoist.attr(hoistName, '')
+      $root.replaceWith($hoist)
+      mountTo = $hoist[0]
+      mountTo.__jQvmComponentRoot = true
+      $root = getMountNode()
+    }
 
     const template = $template.html()
     const nodes = compile($root, components, directives, state, { template, scope })

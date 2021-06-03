@@ -263,5 +263,31 @@
         })
         .mount()
     </script>
+
+    <div class="line"></div>
+
+    <template id="hoist">
+      <div>hoisted component</div>
+      <my-box :count="count"></my-box>
+      <button jq-on="click:plus">plus</button>
+    </template>
+    <script>
+      $('#hoist')
+        .vm({
+          count: 0,
+        })
+        .component('my-box',
+          $(`
+            <span>
+              <span>{{count}}</span>
+              <button jq-on="click:add">add</button>
+            </span>
+          `)
+            .vm({ count: 1 })
+            .fn('add', state => state.count ++)
+        )
+        .fn('plus', state => state.count ++)
+        .mount()
+    </script>
   </body>
 </html>
