@@ -256,15 +256,17 @@ function vm(initState) {
   // ------------
 
   let latestHash = null
-  const nextTick = throttle(() => {
+  const nextTick = throttle((e) => {
     if (!state || !latestHash) {
       return
     }
 
     const currentHash = getObjectHash(state)
     if (latestHash !== currentHash) {
-      change()
-      render(true)
+      const needToUpdate = e ? change(e) : true
+      if (needToUpdate) {
+        render(true)
+      }
     }
 
     latestHash = currentHash
@@ -500,9 +502,12 @@ function vm(initState) {
     }
   }
 
-  function change() {
+  function change(e) {
     const $root = getMountNode()
-    $root.trigger('$change')
+    let flag = true
+    const prevent = () => flag = false
+    $root.trigger('$change', [e, prevent])
+    return flag
   }
 
   function mount(el) {
@@ -634,9 +639,9 @@ function vm(initState) {
     const info = [...args]
     const fn = info.pop()
 
-    const action = function(e) {
+    const action = function(e, ...params) {
       const handle = fn.call(view, state)
-      const res = isFunction(handle) ? handle.call(this, e) : null
+      const res = isFunction(handle) ? handle.call(this, e, ...params) : null
       return res
     }
 

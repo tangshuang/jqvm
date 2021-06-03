@@ -248,5 +248,20 @@
       })
       .mount()
     </script>
+
+    <template id="prevent-update">
+      <div>{{title}}</div>
+      <button jq-on="click:handleChange">change</button>
+    </template>
+
+    <script>
+      $('#prevent-update').vm({ title: 'old title' })
+        .fn('handleChange', state => state.title = 'new title')
+        .on('$change', () => (e, data, prevent) => {
+          console.log(data)
+          prevent()
+        })
+        .mount()
+    </script>
   </body>
 </html>
