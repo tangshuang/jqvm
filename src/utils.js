@@ -87,7 +87,7 @@ export function getPath($element, $root, prefix = []) {
   }
 
   const items = [].concat(prefix).concat(path)
-  return items.join('>')
+  return '>' + items.join('>')
 }
 
 // function findByPath($root, selectors) {
