@@ -4,7 +4,7 @@ import {
   diffArray, uniqueArray, getObjectHash, createReactive,
   isEqual, throttle, filter as filterProps, isShallowEqual,
 } from 'ts-fns'
-import { createAttrs, getPath, camelCase, parseKey } from './utils.js'
+import { getPath, camelCase, parseKey, getNodeName, getNodeAttrs, createAttrsText } from './utils.js'
 
 let vmId = 0
 let $ = null
@@ -43,7 +43,7 @@ function filter(name, fn) {
 // ----------- compiler ---------------
 
 // clear and revoke effects
-const prepare = ($root) => {
+function prepare($root) {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
@@ -62,22 +62,41 @@ const prepare = ($root) => {
   records.length = 0
 }
 
-const compile = ($root, components, directives, state, { template, scope }) => {
+function compile($root, components, directives, state, [template, scope]) {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
-  const $element = $('<div />').html(template)
+  const $element = $(`<div />`).html(template)
 
   const createIterator = (onCompile, affect, isComp) => function() {
     const el = this
     const $el = $(el)
-    const attrs = createAttrs(this.attributes)
+    const attrs = getNodeAttrs(this)
+    const componentName = getNodeName(this)
 
     let els = [el]
 
     // register a view as component
     if (isComp && onCompile instanceof View) {
       const component = onCompile.clone()
+
+      // replace component tag
+      if (component.tag !== 'template') {
+        const { tag, attributes } = component
+        const $tag = $(`<${tag} />`)
+
+        const attrsText = createAttrsText(attrs)
+        const $commentBegin = $(`<!-- ${componentName} ${attrsText} begin -->`)
+        const $commentEnd = $(`<!-- ${componentName} ${attrsText} end -->`)
+
+        Object.assign(attrs, attributes, {
+          ['data-hoist']: componentName,
+        })
+        $tag.attr(attrs)
+        $el.replaceWith([$commentBegin, $tag, $commentEnd])
+        els = [$tag[0]]
+      }
+
       const record = { affect, attrs, component, state, els }
       els.forEach(el => el.__jQvmCompiledRecord = record)
       records.push(record)
@@ -139,10 +158,140 @@ const compile = ($root, components, directives, state, { template, scope }) => {
   }
   interpolate($element)
 
-  return $element[0].childNodes
+  return [...$element[0].childNodes]
 }
 
-const affect = ($root, scope, view) => {
+function diffAndPatch($root, nodes) {
+  // we will not use next to replace current node, so we should transform record info to old node
+  const transferRecord = (current, next) => {
+    const record = next.__jQvmCompiledRecord
+    if (!record) {
+      return
+    }
+
+    const { els } = record
+    els.forEach((el, i) => {
+      if (el === next) {
+        els[i] = current
+      }
+    })
+    current.__jQvmCompiledRecord = record
+  }
+
+  const diffAndPatchNode = ($current, $next) => {
+    const current = $current[0]
+    const next = $next[0]
+
+    const currentAttrs = getNodeAttrs(current)
+    const nextAttrs = getNodeAttrs(next)
+
+    const currentAttrNames = Object.keys(currentAttrs)
+    const nextAttrNames = Object.keys(nextAttrs)
+
+    // update/add attrs
+    nextAttrNames.forEach((name) => {
+      const currentValue = currentAttrs[name]
+      const nextValue = nextAttrs[name]
+
+      if (currentValue !== nextValue) {
+        $current.attr(name, nextValue)
+      }
+    })
+
+    // remove no use attrs
+    const diffAttrNames = diffArray(currentAttrNames, nextAttrNames)
+    diffAttrNames.forEach((name) => {
+      // keep style and class attributes
+      if (name === 'style' || name === 'class' || name === 'jq-vm') {
+        return
+      }
+      $current.removeAttr(name)
+    })
+
+    transferRecord(current, next)
+
+    // dont diff component inner content
+    if (current.__jQvmComponent && current.nodeName === next.nodeName) {
+      return
+    }
+
+    if (!next.childNodes) {
+      return
+    }
+
+    const nextChildren = [...next.childNodes]
+    diffAndPatchChildren($current, nextChildren)
+  }
+
+  const diffAndPatchChildren = ($parent, nextChildren) => {
+    const parentNode = $parent[0]
+    const children = parentNode.childNodes
+
+    // append all children at once if current is empty inside
+    if (!children.length) {
+      nextChildren.forEach((child) => {
+        parentNode.appendChild(child)
+      })
+      return
+    }
+
+    nextChildren.forEach((next, i) => {
+      const $next = $(next)
+      const current = children[i]
+      const $current = $(current)
+      const nextId = $next.attr('id')
+
+      // current index node not existing, insert the coming node directly
+      if (!current) {
+        parentNode.appendChild(next)
+      }
+      // use `jq-id` to unique element
+      else if (nextId) {
+        const $prev = $parent.find(`[id=${nextId}]`)
+        if ($prev.length) {
+          const prev = $prev[0]
+          // move it
+          if (prev !== current) {
+            parentNode.insertBefore(prev, current)
+            transferRecord(current, next)
+          }
+          // update the node
+          diffAndPatchNode($prev, $next)
+        }
+        else {
+          parentNode.insertBefore(next, current)
+        }
+      }
+      // insert coming child directly
+      else if (next.nodeName !== current.nodeName) {
+        parentNode.insertBefore(next, current)
+      }
+      // diff and patch element
+      else if (next.nodeName !== '#text') {
+        diffAndPatchNode($current, $next)
+        transferRecord(current, next)
+      }
+      // diff and patch text
+      else {
+        if (next.textContent !== current.textContent) {
+          current.textContent = next.textContent
+        }
+      }
+    })
+
+    // remove no use elements
+    for (let i = nextChildren.length, len = parentNode.childNodes.length; i < len; i ++) {
+      const child = parentNode.childNodes[i]
+      if (child) {
+        parentNode.removeChild(child)
+      }
+    }
+  }
+
+  diffAndPatchChildren($root, nodes)
+}
+
+function affect($root, scope, view) {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
@@ -182,10 +331,13 @@ const affect = ($root, scope, view) => {
             outside[key] = exp
           }
         })
-        component.update(outside, SYMBOL)
-        if (!$el[0].__jQvmComponentRoot) {
-          $el[0].__jQvmComponentRoot = true
+        if (!el.__jQvmComponent) {
+          component.update(outside, SYMBOL)
           component.mount($el)
+          el.__jQvmComponent = component
+        }
+        else {
+          el.__jQvmComponent.update(outside, SYMBOL)
         }
 
         // let attrs has the result so that we can use them in effects
@@ -333,35 +485,14 @@ function vm(initState) {
   }
 
   function render(isUpdating) {
-    let $root = getMountNode()
+    const $root = getMountNode()
 
     prepare($root)
 
-    // i.e. $(`<span>xxx</span>`)
-    const tagName = $template[0].nodeName.toLowerCase()
-    const isHoist = !$(document).find($template).length && tagName !== 'template'
-    // when create at first time
-    if (isHoist && !isUpdating) {
-      const hoistName = $root[0].nodeName.toLowerCase()
-      console.log(hoistName)
-      const $hoist = $(`<${tagName} />`)
-      const attributes = $template[0].attributes || []
-      const attrs = [...attributes]
-      attrs.forEach(({ name, value}) => {
-        $hoist.attr(name, value)
-      })
-      $hoist.attr(hoistName, '')
-      $root.replaceWith($hoist)
-      mountTo = $hoist[0]
-      mountTo.__jQvmComponentRoot = true
-      $root = getMountNode()
-    }
-
-    const template = $template.html()
-    const nodes = compile($root, components, directives, state, { template, scope })
+    const nodes = compile($root, components, directives, state, [$template.html(), scope])
 
     if (!!isUpdating) {
-      diffAndPatch($root, $('<div />').html(nodes), true)
+      diffAndPatch($root, nodes)
     }
     else {
       $root.html(nodes)
@@ -395,131 +526,6 @@ function vm(initState) {
     }
 
     $root.trigger('$render')
-  }
-
-  // we will not use next to replace current node, so we should transform record info to old node
-  const transferRecord = (current, next) => {
-    const record = next.__jQvmCompiledRecord
-    if (!record) {
-      return
-    }
-
-    const { els } = record
-    els.forEach((el, i) => {
-      if (el === next) {
-        els[i] = current
-      }
-    })
-    current.__jQvmCompiledRecord = record
-  }
-
-  function diffAndPatch($current, $next, top) {
-    const current = $current[0]
-    const next = $next[0]
-
-    const currentAttrs = createAttrs(current.attributes || [])
-    const nextAttrs = createAttrs(next.attributes || [])
-
-    const currentAttrNames = Object.keys(currentAttrs)
-    const nextAttrNames = Object.keys(nextAttrs)
-
-    // update/add attrs
-    nextAttrNames.forEach((name) => {
-      const currentValue = currentAttrs[name]
-      const nextValue = nextAttrs[name]
-
-      if (currentValue !== nextValue) {
-        $current.attr(name, nextValue)
-      }
-    })
-
-    // remove no use attrs
-    if (!top) {
-      const diffAttrNames = diffArray(currentAttrNames, nextAttrNames)
-      diffAttrNames.forEach((name) => {
-        // keep style and class attributes
-        if (name === 'style' || name === 'class' || name === 'jq-vm') {
-          return
-        }
-        $current.removeAttr(name)
-      })
-    }
-
-    transferRecord(current, next)
-
-    // dont diff component inner content
-    if (current.__jQvmComponentRoot && current.nodeName === next.nodeName) {
-      return
-    }
-
-    const currentChildren = [...current.childNodes]
-    const nextChildren = [...next.childNodes]
-
-    // append all children at once if current is empty inside
-    if (!currentChildren.length) {
-      nextChildren.forEach((child) => {
-        current.appendChild(child)
-      })
-      return
-    }
-
-    /**
-     * diff and patch children
-     */
-
-    const $parent = $current
-    const parentNode = current
-    nextChildren.forEach((next, i) => {
-      const $next = $(next)
-      const current = parentNode.childNodes[i]
-      const $current = $(current)
-      const nextId = $next.attr('id')
-
-      // current index node not existing, insert the coming node directly
-      if (!current) {
-        parentNode.insertBefore(next, current)
-      }
-      // use `jq-id` to unique element
-      else if (nextId) {
-        const $prev = $parent.find(`[id=${nextId}]`)
-        if ($prev.length) {
-          const prev = $prev[0]
-          // move it
-          if (prev !== current) {
-            parentNode.insertBefore(prev, current)
-            transferRecord(current, next)
-          }
-          // update the node
-          diffAndPatch($prev, $next)
-        }
-        else {
-          parentNode.insertBefore(next, current)
-        }
-      }
-      // insert coming child directly
-      else if (next.nodeName !== current.nodeName) {
-        parentNode.insertBefore(next, current)
-      }
-      // diff and patch element
-      else if (next.nodeName !== '#text') {
-        diffAndPatch($current, $next)
-        transferRecord(current, next)
-      }
-      // diff and patch text
-      else {
-        if (next.textContent !== current.textContent) {
-          current.textContent = next.textContent
-        }
-      }
-    })
-
-    // remove no use elements
-    for (let i = nextChildren.length, len = current.childNodes.length; i < len; i ++) {
-      const child = current.childNodes[i]
-      if (child) {
-        current.removeChild(child)
-      }
-    }
   }
 
   function change(e) {
@@ -618,7 +624,7 @@ function vm(initState) {
   function update(nextState, isOutside) {
     if (isOutside === SYMBOL) {
       if (isMounted) {
-        assignOutsideState(state, outside)
+        assignOutsideState(state, nextState)
         outside = nextState
       }
       else {
@@ -786,6 +792,15 @@ function vm(initState) {
     clone,
   })
 
+  const tempEl = $template[0]
+  const tag = getNodeName(tempEl)
+  const attributes = getNodeAttrs(tempEl)
+  Object.defineProperties(view, {
+    tag: { value: tag },
+    attributes: { value: attributes },
+    isMounted: { get: () => isMounted },
+  })
+
   listen()
 
   return view
@@ -800,6 +815,9 @@ directive('jq-repeat', function($el, attrs) {
     throw new Error('jq-repeat should match formatter `value,key in data traceby id`!')
   }
 
+  const el = $el[0]
+  const nodeName = getNodeName(el)
+
   const [kv, , dataKey, , traceBy] = attr.split(' ')
   const [valueName, keyName] = kv.split(',')
 
@@ -812,9 +830,9 @@ directive('jq-repeat', function($el, attrs) {
     $el.attr('data-id', `{{${traceBy}}}`)
   }
 
-  const template = $el[0].outerHTML
   const $els = []
 
+  const temp = el.outerHTML
   each(data, (value, key) => {
     const newScope = {
       [valueName]: value,
@@ -824,12 +842,12 @@ directive('jq-repeat', function($el, attrs) {
     }
     const scope = parentScope.$new(newScope)
 
-    const nodes = compile({ template, scope })
-    $els.push(nodes)
+    const nodes = compile([temp, scope])
+    $els.push(...nodes)
   })
 
-  const $commentBegin = $(`<!-- ${$el[0].nodeName.toLowerCase()} jq-repeat="${attr}" begin -->`)
-  const $commentEnd = $(`<!-- ${$el[0].nodeName.toLowerCase()} jq-repeat="${attr}" end -->`)
+  const $commentBegin = $(`<!-- ${nodeName} jq-repeat="${attr}" begin -->`)
+  const $commentEnd = $(`<!-- ${nodeName} jq-repeat="${attr}" end -->`)
 
   $el.replaceWith([$commentBegin, ...$els, $commentEnd])
 })
@@ -837,7 +855,7 @@ directive('jq-repeat', function($el, attrs) {
 directive('jq-if', function($el, attrs) {
   const attr = attrs['jq-if']
   const value = this.scope.parse(attr)
-  return value ? $el : `<!-- ${$el[0].nodeName.toLowerCase()} jq-if="${attr}" (hidden) -->`
+  return value ? $el : `<!-- ${getNodeName($el[0])} jq-if="${attr}" (hidden) -->`
 })
 
 directive('jq-id', function($el, attrs) {

@@ -1,4 +1,4 @@
-import { isString } from 'ts-fns'
+import { isString, each } from 'ts-fns'
 
 export function getOuterHTML(el) {
   const nodeName = el.nodeName.toLowerCase()
@@ -17,21 +17,24 @@ export function getOuterHTML(el) {
   return str
 }
 
-export function getAttrs(el) {
-  return [...el.attributes].map(item => ({
-    name: item.name,
-    value: item.value,
-  }))
-}
-
-export function createAttrs(attributes = []) {
-  const oAttrs = Array.from(attributes)
+export function getNodeAttrs(el) {
+  const attributes = el.attributes || []
+  const oAttrs = [...attributes]
   const attrs = {}
   oAttrs.forEach((node) => {
     const { name, value } = node
     attrs[name] = value
   })
   return attrs
+}
+
+export function createAttrsText(attrs) {
+  const attrsTexts = []
+  each(attrs, (value, key) => {
+    attrsTexts.push(`${key}="${value}"`)
+  })
+  const attrsText = attrsTexts.join(' ')
+  return attrsText
 }
 
 export function tryParseJSON(v, callback) {
@@ -146,4 +149,8 @@ export function parseKey(str) {
       .filter(item => !!item)
     : void 0
   return [name, params]
+}
+
+export function getNodeName(node) {
+  return node.nodeName.toLowerCase()
 }
