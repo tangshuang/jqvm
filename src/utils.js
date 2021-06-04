@@ -93,41 +93,6 @@ export function getPath($element, $root, prefix = []) {
   return '>' + items.join('>')
 }
 
-// function findByPath($root, selectors) {
-//   // if (parseComments && item.nodeName === '#comment') {
-//   //   const { textContent } = item
-//   //   if (textContent.indexOf(' jq-if=') > 0) {
-//   //     const tag = textContent.trim().split(' ').shift()
-//   //     if (tag === child.nodeName) {
-//   //       index ++
-//   //     }
-//   //   }
-//   //   else if (textContent.indexOf(' jq-repeat=') > 0 && textContent.indexOf(' begin ')) {
-//   //     const tag = textContent.trim().split(' ').shift()
-//   //     i ++
-//   //     let next = children[i]
-//   //     if (next) {
-//   //       if (tag === child.nodeName) {
-//   //         index ++
-//   //       }
-
-//   //       // skip those repeated
-//   //       const [, repeat] = textContent.match()
-//   //       while (next) {
-//   //         if (next.nodeName !== '#comment') {
-//   //           i ++
-//   //           next = children[i]
-//   //         }
-//   //         else if (next.textContent.indexOf(` jq-repeat="${repeat}"`) > 0 && next.textContent.indexOf(' end ')) {
-//   //           i ++
-//   //           break
-//   //         }
-//   //       }
-//   //     }
-//   //   }
-//   // }
-// }
-
 export function camelCase(str) {
   const items = str.split(/\W|_/).filter(item => !!item)
   const texts = items.map((item, i) => {
