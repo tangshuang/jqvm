@@ -84,7 +84,7 @@ $('#app')
 
 **第3步：事件监听**
 
-你可以像使用jQuery的on一样，对实例化的界面内部的元素进行时间监听。
+你可以像使用jQuery的on一样，对实例化的界面内部的元素进行监听。
 
 ```html
 <script>
@@ -272,10 +272,6 @@ directive(name:string, compile:function, affect:function)
 - compile($el, attrs): 编译期对节点的处理方法，必须返回undefined|$el|htmlstring
 - affect($el, attrs): 渲染结束后对节点的处理方法，你可以在这里绑定事件，但是注意，如果你绑定了事件，必须返回一个函数，这个函数用于解除事件绑定
 
-```js
-
-```
-
 ```html
 <template id="app">
   <a jq-link="xxx">link</a>
@@ -393,7 +389,7 @@ $('#component')
 
 组件接收外部通过属性的方式传入数据，有3种形式：
 
-- `type="search"` 普通的字符串
+- `type="search"` 接收到普通的字符串
 - `:type="'search'"` :开头，表达式，组件接收到的是计算后的值
 - `@change="fn"` @开头，组件事件系统的回调函数，前文讲过
 
@@ -409,6 +405,8 @@ const view = $(`
   .component('my-box', box)
 // :a="2" 正常工作，但是c="xxx"没有任何作用（对内部而言）
 ```
+
+*需要注意，`:`开头的属性，仅限于自定义组件，普通HTML元素不支持。`type="{{type}}"`这种形式也可以基于状态动态设定值，但是它和`:type="type"`不同的是，前者传递给组件内部的是纯字符串，而后者传递进去的是表达式的结果，也就可能是数字或对象。*
 
 **组件事件系统**
 
