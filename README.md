@@ -434,6 +434,31 @@ view.filter('number', number)
 
 The first paramter of the function is the value receive from the previous before `|`.
 
+## Store
+
+To share state among components, you may use a store to maintain the shared state:
+
+```js
+// create store and share it between two components by passing `store` into `.vm(store)`
+const { createStore } = $.vm
+const store = createStore({ count: 10 })
+const componentA = $('<span>{{count}}</span>')
+  .vm(store)
+const componentB = $('<div>count: {{count}}</div>')
+  .vm(store)
+
+// using the two components
+<template id="app">
+  <comp-a></comp-a>
+  <comp-b></comp-b>
+</template>
+
+$('#app').vm({})
+  .component('comp-a', componentA)
+  .component('comp-b', componentB)
+  .mount()
+```
+
 ## :see_no_evil: License
 
 MIT.

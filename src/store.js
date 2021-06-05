@@ -1,6 +1,14 @@
-import { assign } from 'ts-fns'
+import { assign, isFunction } from 'ts-fns'
 
-export function createStore(initState) {
+/**
+ *
+ * @param {object} initState
+ * @param {object} options
+ * @param {function} options.onChange invoke when state change
+ * @param {function} options.drive drive the state to be changed, i.e. (update) => { setInterval(() => update(state => state.age ++, 1000)) }
+ * @returns
+ */
+export function createStore(initState, options) {
   const views = []
   return function() {
     const view = this
@@ -8,6 +16,9 @@ export function createStore(initState) {
     view.on('$change', () => (e, { keyPath, value }) => {
       views.forEach((item) => {
         if (item === view) {
+          if (options && isFunction(options.onChange)) {
+            options.onChange(keyPath, value)
+          }
           return
         }
         item.update((state) => {
@@ -22,6 +33,11 @@ export function createStore(initState) {
         }
       })
     })
+
+    if (options && isFunction(options.drive)) {
+      options.drive((arg) => view.update(arg))
+    }
+
     return initState
   }
 }

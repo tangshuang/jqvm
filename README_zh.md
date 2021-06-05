@@ -456,6 +456,54 @@ view.filter('number', number)
 
 `|`是管道标识符，在很多系统中都有这种用法。简单说，|前面的值，将被|后面的过滤器处理，处理结果又会被再后面的过滤器处理。最后一个过滤器处理输出的结果就是最终的结果。
 
+## 状态管理
+
+有些情况下，你不想通过props传递的方式把状态从上往下传递，你希望通过一个桥梁，方便的在多个组件之间共享状态。此时，你可以借助`createStore`来创建一个状态管理器。具体如下使用：
+
+```js
+import { createStore } from 'jqvm'
+```
+
+或者
+
+```js
+const { createStore } = $.vm
+```
+
+然后创建一个状态管理器：
+
+```js
+const store = createStore({ count: 0 }, {
+  onChange(keyPath, value) {
+    // 此处用于收集
+  },
+  drive(update) {
+    // 此处用于回放
+    update(state => state.count ++)
+  },
+})
+```
+
+它有两个参数：
+
+- initState: object 初始状态
+- options:
+  - onChange(keyPath:string[], value:any) 当状态发生变化时被调用执行
+  - drive(update:Function) 当一个组件被第一次挂载时执行，参数update用法和view.update一致。通过drive参数，你可以实现根据收集到的变化进行回放。
+
+通过上面的步骤，你创建了一个store，接下来，将该store作为`.vm(store)`参数进行使用。
+
+```js
+const componentA = $('<span>{{count}}</span>')
+  .vm(store)
+const componentB = $('<div>count: {{count}}</div>')
+  .vm(store)
+```
+
+经过上面步骤，componentA和componentB拥有同一个state的引用，也就是说，它们内部操作state时，两个组件都会被同时更新。
+
+最后，就是在其他地方使用这两个组件。
+
 ## :see_no_evil: 开源协议
 
 MIT.
