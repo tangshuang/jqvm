@@ -260,8 +260,7 @@
 
     <template id="missing-path-test">
       <div jq-if="!src">loading</div>
-      <img jq-src="src" jq-if="!src" />
-      <img jq-src="src" jq-if="src" />
+      <img jq-src="src" jq-if="src" width="400" height="auto" />
     </template>
 
     <script>
@@ -291,5 +290,42 @@
         .mount()
     </script>
 
+    <div class="line"></div>
+
+    <h2>Shared Store</h2>
+
+    <template id="store1">
+      <span>{{name}}</span>
+      <span>{{age}}</span>
+      <button class="grow">grow</button>
+      <button class="reset">reset</button>
+    </template>
+    <template id="store2">
+      <span>{{name}}</span>
+      <span>{{age}}</span>
+      <button>grow</button>
+      <div jq-if="age < 11">
+        inner: <my-box></my-box>
+      </div>
+    </template>
+    <script>
+      const { createStore } = $.vm
+      const store = createStore({
+        name: 'tomy',
+        age: 10,
+      })
+      const inner = $(`<span>{{age}}</span>`)
+        .vm(store)
+      $('#store1')
+        .vm(store)
+        .on('click', 'button.grow', state => state.age ++)
+        .on('click', 'button.reset', state => state.age = 9)
+        .mount()
+      $('#store2')
+        .vm(store)
+        .on('click', 'button', state => state.age ++)
+        .component('my-box', inner)
+        .mount()
+    </script>
   </body>
 </html>

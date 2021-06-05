@@ -5,6 +5,7 @@ import {
   isEqual, throttle, filter as filterProps, isShallowEqual,
 } from 'ts-fns'
 import { getPath, camelCase, parseKey, getNodeName, getNodeAttrs, createAttrsText } from './utils.js'
+import { createStore } from './store.js'
 
 let vmId = 0
 let $ = null
@@ -65,20 +66,31 @@ function prepare($root) {
 function compile($root, components, directives, state, [template, scope]) {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
+  const instances = root.__jQvmComponentInstances = root.__jQvmComponentInstances || []
 
   const $element = $(`<div />`).html(template)
 
-  const createIterator = (onCompile, affect, isComp) => function() {
+  const createIterator = (onCompile, affect, isComp) => function(index) {
     const el = this
     const $el = $(el)
     const attrs = getNodeAttrs(this)
-    const componentName = getNodeName(this)
+    const name = getNodeName(this)
 
     let els = [el]
 
     // register a view as component
     if (isComp && onCompile instanceof View) {
-      const component = onCompile.clone()
+      let component = null
+
+      const instance = instances.find(item => item.name === name && item.index === index)
+      if (instance) {
+        component = instance.component
+      }
+      else {
+        component = onCompile.clone()
+        const item = { name, index, component }
+        instances.push(item)
+      }
 
       // replace component tag
       if (component.tag !== 'template') {
@@ -86,11 +98,11 @@ function compile($root, components, directives, state, [template, scope]) {
         const $tag = $(`<${tag} />`)
 
         const attrsText = createAttrsText(attrs)
-        const $commentBegin = $(`<!-- ${componentName} ${attrsText} begin -->`)
-        const $commentEnd = $(`<!-- ${componentName} ${attrsText} end -->`)
+        const $commentBegin = $(`<!-- ${name} ${attrsText} begin -->`)
+        const $commentEnd = $(`<!-- ${name} ${attrsText} end -->`)
 
         Object.assign(attrs, attributes, {
-          ['data-hoist']: componentName,
+          ['data-hoist']: name,
         })
         $tag.attr(attrs)
         $el.replaceWith([$commentBegin, $tag, $commentEnd])
@@ -283,6 +295,17 @@ function diffAndPatch($root, nodes) {
     for (let i = nextChildren.length, len = parentNode.childNodes.length; i < len; i ++) {
       const child = parentNode.childNodes[i]
       if (child) {
+        if (child.__jQvmComponent) {
+          child.__jQvmComponent.unmount()
+          delete child.__jQvmComponent
+        }
+        const all = $(child).find('*')
+        all.each(function() {
+          if (this.__jQvmComponent) {
+            this.__jQvmComponent.unmount()
+            delete this.__jQvmComponent
+          }
+        })
         parentNode.removeChild(child)
       }
     }
@@ -300,6 +323,10 @@ function affect($root, scope, view) {
 
     if (component) {
       els.forEach((el) => {
+        if (!$(document).find(el).length) {
+          return
+        }
+
         const $el = $(el)
         const outside = {}
         each(attrs, (exp, attr) => {
@@ -331,13 +358,11 @@ function affect($root, scope, view) {
             outside[key] = exp
           }
         })
+
+        component.update(outside, SYMBOL)
         if (!el.__jQvmComponent) {
-          component.update(outside, SYMBOL)
           component.mount($el)
           el.__jQvmComponent = component
-        }
-        else {
-          el.__jQvmComponent.update(outside, SYMBOL)
         }
 
         // let attrs has the result so that we can use them in effects
@@ -377,6 +402,7 @@ function vm(initState) {
 
   let mountTo = null
   let isMounted = false
+  let isUnmounted = false
   const getMountNode = () => {
     return mountTo ? $(mountTo) : $template.next(root)
   }
@@ -467,7 +493,7 @@ function vm(initState) {
   }
 
   function listen() {
-    $template.on('$mount', () => {
+    $template.on('$mount', function(e) {
       const $root = getMountNode()
       actions.forEach((item) => {
         const { type, info, action } = item
@@ -475,9 +501,9 @@ function vm(initState) {
       })
     })
 
-    $template.on('$unmount', () => {
+    $template.on('$unmount', (e) => {
       const $root = getMountNode()
-      actions.forEach((item, i) => {
+      actions.forEach((item) => {
         const { info, action } = item
         $root.off(...info, action)
       })
@@ -485,13 +511,17 @@ function vm(initState) {
   }
 
   function render(isUpdating) {
+    if (isUpdating && !isMounted) {
+      return
+    }
+
     const $root = getMountNode()
 
     prepare($root)
 
     const nodes = compile($root, components, directives, state, [$template.html(), scope])
 
-    if (!!isUpdating) {
+    if (isUpdating) {
       diffAndPatch($root, nodes)
     }
     else {
@@ -555,7 +585,9 @@ function vm(initState) {
       return view
     }
 
-    init(initState)
+    if (!isUnmounted) {
+      init(initState)
+    }
 
     let $root = null
 
@@ -570,9 +602,7 @@ function vm(initState) {
       throw new Error('el should must be passed by view.mount')
     }
     else {
-      $root = $('<div />', {
-        'jq-vm': hash,
-      })
+      $root = $('<div />', { 'jq-vm': hash, })
       $template.after($root)
     }
 
@@ -581,6 +611,7 @@ function vm(initState) {
     $root.trigger('$mount')
 
     isMounted = true
+    isUnmounted = false
 
     return view
   }
@@ -597,7 +628,6 @@ function vm(initState) {
     }
 
     $root.trigger('$unmount')
-    $template.trigger('$unmount')
 
     if (mountTo) {
       $root.html('')
@@ -609,52 +639,64 @@ function vm(initState) {
 
     mountTo = null
     isMounted = false
+    isUnmounted = true
 
     return view
   }
 
   function destroy() {
+    const $root = getMountNode()
+
     unmount()
 
     state = null
     scope = null
     actions.length = 0
+
+    $root.trigger('$destroy')
+
+    const root = $root[0]
+    delete root.__jQvmComponentInstances
+    delete root.__jQvmCompiledRecords
   }
 
   function update(nextState, isOutside) {
     if (isOutside === SYMBOL) {
-      if (isMounted) {
+      if (state) {
         assignOutsideState(state, nextState)
-        outside = nextState
       }
-      else {
-        outside = nextState
-      }
-      return
-    }
-
-    if (!isMounted) {
+      outside = nextState
       return view
     }
 
     // force update
     if (nextState === true) {
-      render(true)
+      if (isMounted) {
+        render(true)
+      }
       return view
     }
 
     // when nextState passed, assign to state will trigger rerender
-    if (nextState) {
+    if (state && nextState) {
       if (isFunction(nextState)) {
-        nextState = nextState(state)
+        const res = nextState(state)
+        if (isObject(res)) {
+          Object.assign(state, res)
+        }
+        else if (isMounted) {
+          nextTick()
+        }
+        return view
       }
-
-      if (isObject(nextState)) {
+      else if (isObject(nextState)) {
         Object.assign(state, nextState)
+        return view
       }
     }
+
     // if not passed nextState, it means to check manually
-    else {
+    if (isMounted && nextState) {
       nextTick()
     }
 
@@ -798,7 +840,6 @@ function vm(initState) {
   Object.defineProperties(view, {
     tag: { value: tag },
     attributes: { value: attributes },
-    isMounted: { get: () => isMounted },
   })
 
   listen()
@@ -969,6 +1010,7 @@ function useJQuery(jQuery) {
     directive,
     filter,
     View,
+    createStore,
   }
   return $
 }
@@ -978,4 +1020,4 @@ if (typeof jQuery !== 'undefined') {
   useJQuery(jQuery)
 }
 
-export { component, directive, filter, View, useJQuery }
+export { component, directive, filter, View, useJQuery, createStore }
