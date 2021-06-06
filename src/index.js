@@ -6,6 +6,7 @@ import {
 } from 'ts-fns'
 import { getPath, camelCase, parseKey, getNodeName, getNodeAttrs, createAttrsText } from './utils.js'
 import { createStore } from './store.js'
+import { createAsyncComponent } from './async.js'
 
 let vmId = 0
 let $ = null
@@ -63,7 +64,7 @@ function prepare($root) {
   records.length = 0
 }
 
-function compile($root, components, directives, state, [template, scope]) {
+function compile($root, components, directives, state, view, [template, scope]) {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
   const instances = root.__jQvmComponentInstances = root.__jQvmComponentInstances || []
@@ -78,8 +79,7 @@ function compile($root, components, directives, state, [template, scope]) {
 
     let els = [el]
 
-    // register a view as component
-    if (isComp && onCompile instanceof View) {
+    const generateComponent = (view) => {
       let component = null
 
       const instance = instances.find(item => item.name === name && item.index === index)
@@ -87,7 +87,7 @@ function compile($root, components, directives, state, [template, scope]) {
         component = instance.component
       }
       else {
-        component = onCompile.clone()
+        component = view.clone()
         const item = { name, index, component }
         instances.push(item)
       }
@@ -112,6 +112,11 @@ function compile($root, components, directives, state, [template, scope]) {
       const record = { affect, attrs, component, state, els }
       els.forEach(el => el.__jQvmCompiledRecord = record)
       records.push(record)
+    }
+
+    // register a view as component
+    if (isComp && onCompile instanceof View) {
+      generateComponent(onCompile)
       return
     }
 
@@ -119,9 +124,16 @@ function compile($root, components, directives, state, [template, scope]) {
       // developers can recompile inside fn
       const context = {
         scope,
-        compile: compile.bind(null, $root, components, directives, state),
+        view,
+        compile: compile.bind(null, $root, components, directives, state, view),
       }
       const output = onCompile.call(context, $el, attrs)
+
+      if (isComp && output && output instanceof View) {
+        generateComponent(output)
+        return
+      }
+
       if (!isNone(output) && $el !== output) {
         const $newEls = $(output)
         $el.replaceWith($newEls)
@@ -170,7 +182,8 @@ function compile($root, components, directives, state, [template, scope]) {
   }
   interpolate($element)
 
-  return [...$element[0].childNodes]
+  const nodes = [...$element[0].childNodes]
+  return nodes
 }
 
 function diffAndPatch($root, nodes) {
@@ -237,10 +250,9 @@ function diffAndPatch($root, nodes) {
 
   const diffAndPatchChildren = ($parent, nextChildren) => {
     const parentNode = $parent[0]
-    const children = parentNode.childNodes
 
     // append all children at once if current is empty inside
-    if (!children.length) {
+    if (!parentNode.childNodes.length) {
       nextChildren.forEach((child) => {
         parentNode.appendChild(child)
       })
@@ -249,17 +261,12 @@ function diffAndPatch($root, nodes) {
 
     nextChildren.forEach((next, i) => {
       const $next = $(next)
-      const current = children[i]
+      const current = parentNode.childNodes[i]
       const $current = $(current)
       const nextId = $next.attr('id')
+      const nextDataId = $next.attr('data-id')
 
-      // current index node not existing, insert the coming node directly
-      if (!current) {
-        parentNode.appendChild(next)
-      }
-      // use `jq-id` to unique element
-      else if (nextId) {
-        const $prev = $parent.find(`[id=${nextId}]`)
+      const move = ($prev) => {
         if ($prev.length) {
           const prev = $prev[0]
           // move it
@@ -274,12 +281,26 @@ function diffAndPatch($root, nodes) {
           parentNode.insertBefore(next, current)
         }
       }
+
+      // current index node not existing, insert the coming node directly
+      if (!current) {
+        parentNode.appendChild(next)
+      }
+      // use `jq-id` to unique element
+      else if (nextId) {
+        const $prev = $parent.find(`[id=${nextId}]`)
+        move($prev)
+      }
+      else if (nextDataId) {
+        const $prev = $parent.find(`[data-id=${nextDataId}]`)
+        move($prev)
+      }
       // insert coming child directly
       else if (next.nodeName !== current.nodeName) {
         parentNode.insertBefore(next, current)
       }
       // diff and patch element
-      else if (next.nodeName !== '#text') {
+      else if (next.nodeName.indexOf('#') !== 0) {
         diffAndPatchNode($current, $next)
         transferRecord(current, next)
       }
@@ -292,22 +313,20 @@ function diffAndPatch($root, nodes) {
     })
 
     // remove no use elements
-    for (let i = nextChildren.length, len = parentNode.childNodes.length; i < len; i ++) {
+    for (let i = parentNode.childNodes.length - 1, start = nextChildren.length; i >= start; i --) {
       const child = parentNode.childNodes[i]
-      if (child) {
-        if (child.__jQvmComponent) {
-          child.__jQvmComponent.unmount()
-          delete child.__jQvmComponent
-        }
-        const all = $(child).find('*')
-        all.each(function() {
-          if (this.__jQvmComponent) {
-            this.__jQvmComponent.unmount()
-            delete this.__jQvmComponent
-          }
-        })
-        parentNode.removeChild(child)
+      if (child.__jQvmComponent) {
+        child.__jQvmComponent.unmount()
+        delete child.__jQvmComponent
       }
+      const all = $(child).find('*')
+      all.each(function() {
+        if (this.__jQvmComponent) {
+          this.__jQvmComponent.unmount()
+          delete this.__jQvmComponent
+        }
+      })
+      parentNode.removeChild(child)
     }
   }
 
@@ -519,7 +538,7 @@ function vm(initState) {
 
     prepare($root)
 
-    const nodes = compile($root, components, directives, state, [$template.html(), scope])
+    const nodes = compile($root, components, directives, state, view, [$template.html(), scope])
 
     if (isUpdating) {
       diffAndPatch($root, nodes)
@@ -1011,6 +1030,7 @@ function useJQuery(jQuery) {
     filter,
     View,
     createStore,
+    createAsyncComponent,
   }
   return $
 }
@@ -1020,4 +1040,4 @@ if (typeof jQuery !== 'undefined') {
   useJQuery(jQuery)
 }
 
-export { component, directive, filter, View, useJQuery, createStore }
+export { component, directive, filter, View, useJQuery, createStore, createAsyncComponent }

@@ -257,6 +257,21 @@
     </script>
 
     <div class="line"></div>
+    <h2>jq-if on component</h2>
+    <template id="jq-if-comp">
+      <div jq-if="loading">Loading</div>
+      <if-comp jq-if="!loading"></if-comp>
+      <button jq-on="click:load">toggle</button>
+    </template>
+    <script>
+      $('#jq-if-comp')
+        .vm({ loading: true })
+        .fn('load', state => state.loading = !state.loading)
+        .component('if-comp', $(`<span>Loaded {{content}}</span>`).vm({ content: 'Content' }))
+        .mount()
+    </script>
+
+    <div class="line"></div>
 
     <template id="missing-path-test">
       <div jq-if="!src">loading</div>
@@ -327,5 +342,28 @@
         .component('my-box', inner)
         .mount()
     </script>
+
+    <div class="line"></div>
+
+    <h2>Async Component</h2>
+    <template id="async-component">
+      <div>Async Load Content:</div>
+      <div jq-if="loading">Loading</div>
+      <my-async></my-async>
+    </template>
+    <script>
+      const { createAsyncComponent } = $.vm
+      $('#async-component')
+        .vm({ loading: true })
+        .component('my-async', createAsyncComponent(
+          () => import('./.demo/async-component.js'),
+          function() {
+            this.update({ loading: false })
+          },
+        ))
+        .mount()
+    </script>
+
+    <div class="line"></div>
   </body>
 </html>

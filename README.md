@@ -459,6 +459,47 @@ $('#app').vm({})
   .mount()
 ```
 
+## Async Component
+
+To split your code with unit by component, you can use `createAsyncComponent` to implement this.
+
+```
+createAsyncComponent(loader:Function, callback:Function) -> compile
+```
+
+- loader: Function to return a jQuery.Deferred or promise which contains a `then` method, a ESModule with `default` export a View instance or a View instance should be put in `then` callback
+- callback: invoke after the deferer resolved, you can visti `this` as current view in it
+
+Example:
+
+```js
+// https://xxx/some-component.js
+export default $(`<span>{{title}}</span>`)
+  .vm(() => ({ title: '' }))
+
+// main.js
+$('#app').vm(...)
+  .component('some-component', createAsyncComponent(() => import('https://xxxx/some-component.js')))
+  .mount()
+```
+
+```js
+// main.js
+$('#app').vm({ loading: true })
+  .component(
+    'my-box',
+    createAsyncComponent(
+      () => $.get('https://xxxx/some-component.template.html')
+        .then((html) => $(html).vm(() => ({ title: '' }))),
+      function() {
+        this.update({ loading: false })
+      },
+    ),
+  )
+```
+
+Or you can use AMD Module system to create a single component as a module to load, so that you can split your code easily.
+
 ## :see_no_evil: License
 
 MIT.

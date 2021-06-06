@@ -504,6 +504,52 @@ const componentB = $('<div>count: {{count}}</div>')
 
 最后，就是在其他地方使用这两个组件。
 
+
+## 异步组件
+
+通过异步组件，你可以很好的实现代码分割，起到一定的提升性能的效果。
+你需要使用`createAsyncComponent`来实现一个异步组件。
+
+```
+createAsyncComponent(loader:Function, callback:Function) -> compile
+```
+
+- loader: 函数，用于返回一个含有`.then`方法的异步对象，可以是原生的`Promise`对象，也可以是`jQuery.Deferred`对象。在`then`中返回的结果可以是一个ES模块（必须包含`default`接口，并且`default`将被作为结果使用），或者是一个普通的结果。无论是`default`接口，还是结果对象本身，都必须是一个`View`的实例。通过下面的例子你可以理解这一描述。
+- callback: 异步模块加载完成后调用执行。你可以在该函数内通过`this`访问当前vm中的view。
+
+例子:
+
+```js
+// https://xxx/some-component.js
+export default $(`<span>{{title}}</span>`)
+  .vm(() => ({ title: '' }))
+
+// main.js
+$('#app').vm(...)
+  .component('some-component', createAsyncComponent(() => import('https://xxxx/some-component.js')))
+  .mount()
+```
+
+```js
+// main.js
+$('#app').vm({ loading: true })
+  .component(
+    'my-box',
+    createAsyncComponent(
+      () => $.get('https://xxxx/some-component.template.html')
+        .then((html) => $(html).vm(() => ({ title: '' }))),
+      function() {
+        this.update({ loading: false })
+      },
+    ),
+  )
+```
+
+通过上面的代码，你可以发现，关键在于你需要异步返回一个View实例给createAsyncComponent。
+
+通过这样的操作，你可以把某些组件单独放到系统外给系统使用，从而减少当前系统代码量，提升性能。
+除了上面使用`import()`之外，其实，你也可以利用AMD模块系统来达到同样的效果（AMD兼容较低版本的浏览器）。
+
 ## :see_no_evil: 开源协议
 
 MIT.
