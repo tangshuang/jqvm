@@ -123,14 +123,43 @@ $('#app')
 
 > jQvm里面有两个概念：View和VM。我们调用`$('#app').vm({ a: 1 })`时会在上下文中建立一个VM，返回的是一个View的实例。VM对开发者不可见，它有一个state作为渲染界面的数据，这个state可在事件监听或方法调用时作为函数的参数被拿到。View实例是开发者使用的主要的对象，这个view提供了一堆方法，具体看下文。
 
-### $.vm
+### 导出接口
 
-`$.vm`是挂载在jQuery对象上的一个静态属性，它提供了一系列的对象给你使用。其中包含了:
+如果你在模块系统中使用，那么如下引入需要的接口：
+
+```js
+import {
+  component,
+  directive,
+  filter,
+  View,
+  useJQuery,
+  createStore,
+  createAsyncComponent,
+} from 'jqvm'
+```
+
+如果在浏览器中使用，可以快速的按下面的方法引入：
+
+```js
+const {
+  component,
+  directive,
+  filter,
+  View,
+  useJQuery,
+  createStore,
+  createAsyncComponent,
+} = window.jqvm
+```
+
+`jqvm`是挂载在jQuery对象上的一个静态属性，它提供了一系列的对象给你使用。其中包含了:
 
 - component(name:string, compile:function, affect:function): 注册全局组件
 - directive(name:string, compile:function, affect:function): 注册全局指令
 - filter(name:string, formatter:function): 注册全局过滤器
 - View: View构造器。基本上不会用到，只会用来作为一些判断依据。
+- useJQuery: 你可以使用另外一个版本的jQuery，一般只在模块系统中使用
 
 ### $.fn.vm
 
@@ -549,6 +578,141 @@ $('#app').vm({ loading: true })
 
 通过这样的操作，你可以把某些组件单独放到系统外给系统使用，从而减少当前系统代码量，提升性能。
 除了上面使用`import()`之外，其实，你也可以利用AMD模块系统来达到同样的效果（AMD兼容较低版本的浏览器）。
+
+## 路由
+
+你可以通过window.location来控制需要展示的部分。使用内置的 `jq-navigator` `jq-route` `jq-link` 组件完成：
+
+```html
+<template id="app">
+  <jq-navigator mode="#">
+    <jq-route match="/" exact="true">
+      <div class="home">Home</div>
+    </jq-route>
+    <jq-route match="/article/:id">
+      <my-article id="{{id}}"></my-artcile>
+    </jq-route>
+  </jq-navigator>
+</template>
+
+<template id="article">
+  <article class="article">
+    <h1>{{title}}</h1>
+    <main>{{content | html}}</main>
+  </article>
+</template>
+```
+
+### jq-navigator
+
+放在jq-navigator里面的所有jq-route和jq-link会被自动设置`mode`。
+
+它只有一个属性，即`mode`，你可以设置3种mode：
+
+- `/` 以`/`开头的mode表示路由系统将使用history模式
+- `#` 以`#`开头的mode表示路由系统使用hash模式
+- `?_url` 以`?`开头的mode表示路由系统使用search模式，比如此处表示`_url`这个参数的值将被视为路径，`_url`可以替换为任意其他值
+
+**根路径**
+
+在配置mode时，如果传入了一个路径，那么被视为根路径。如果路由系统拥有跟路径，那么在其内部，所有路径都会自动加上这段跟路径。举个例子，如果使用了`<jq-navigator mode="/base">`，即表示内部的路由系统设置了跟路径`/base`，那么`<jq-route match="/home">`中的match自动转化为`/base/home`之后与当前的url进行匹配，`<jq-link to="/article/{{id}}">`中的to将自动转化为`/base/article/{{id}}`之后进行跳转。
+
+3种模式设置根路径的方法不同，具体如下：
+
+- `/base` 例如`<jq-navigator mode="/base">`
+- `#/base` 例如`<jq-navigator mode="#/base">`，那么路由系统会去读hash的内容来进行匹配，比如当前的hash为`#/base/home`，那么`<jq-route match="/home">`就正好匹配到
+- `?_url=/base` 例如`<jq-navigator mode="?_url=/base">`，路由系统首先会去读search中的_url字段（_url为开发者自己规定的字段名），并做decode，然后再进行匹配，比如当前的search为`?a=xxx&_url=%2Fbase%2Fhome`，那么`<jq-route match="/home">`就正好匹配到
+
+### jq-route
+
+用于和当前的window.location进行对比，以决定内部的内容是否要进行渲染。
+
+```
+<jq-route match="/home" exact="true" redirect="/home/submit" mode="#">
+```
+
+**match**
+
+用于匹配的路径，注意，它基于上述根路径的规则。
+
+它支持pathname和search两部分，其中pathname部分支持:开头的参数占位符，例如：
+
+```
+match="/article/:id"
+```
+
+其中的`:id`表示此段可以为任意内容。因此，它可以匹配到任意 /article/ 开头的路径。
+
+同时，它也支持search参数，例如：
+
+```
+match="/article?id"
+```
+
+表示它必须匹配类似`/base/article?id=123`这样的路径。这应该比较容易理解。:占位符参数和search参数可以同时设置，例如：
+
+```
+match="/article/:id?mode"
+```
+
+占位符将被作为`jq-route`内部的状态引用名。例如：
+
+```
+<jq-route match="/article/:id?mode=:type">
+  <my-article id="{{id}}" mode="{{type}}">
+</jq-route>
+```
+
+上面模板中，`id`和`type`是由`jq-route`创建的状态引用名，而非当前vm的state上的属性。它们只能通过`{{}}`进行引用。
+
+其中search部分，如果mode后面跟上`=:type`相当于给mode取了一个别名，避免和当前vm的state的属性冲突。在search参数名没有冲突的情况下，你可以直接使用参数名即可，例如：
+
+```
+<jq-route match="/article/:id?mode">
+  <my-article id="{{id}}" mode="{{mode}}">
+</jq-route>
+```
+
+**exact**
+
+是否精确匹配。当不设置时，`/article`这个路径，将会匹配所有以`/article/`开头的其他路径（子路径），当设置了exact之后，它只能匹配一个路径。
+
+**redirect**
+
+匹配成功之后，跳转到哪个路径？
+
+redirect的值和jq-link的to一致。
+
+**mode**
+
+当jq-route没有放在jq-navigator内部时，可以通过设置mode来使用另外一种模式。
+注意：如果放在jq-navigator内部，将被jq-navigator强制覆盖，jq-route自己设置的mode将失效。
+
+### jq-link
+
+通过jq-link创建一个基于`<a>`的链接。
+
+```
+<jq-link to="/article/{{id}}" replace="true" open="true" mode="#">link</jq-link>
+```
+
+用户点击该链接时，浏览器不会发生真实的跳转。
+
+**to**
+
+链接将跳转到哪个路径。注意，to基于上述根路径规则，会自动添加根路径。
+
+**replace**
+
+是否使用history.replaceState进行路由切换，当设置之后，进入下一个路径对应的界面，将无法通过路由器返回按钮回到当前界面。
+
+**open**
+
+是否在新窗口打开，设置之后replace失效，当前浏览器界面窗口不会发生任何变化。
+
+**mode**
+
+和jq-route一样，也可以脱离jq-navigator使用。
 
 ## :see_no_evil: 开源协议
 

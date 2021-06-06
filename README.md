@@ -103,14 +103,39 @@ Here, you call the `on` method and pass a action function to change `state`, and
 
 ## :tada: API
 
-### $.vm
+### Exports
 
-`$.vm` is a set of jqvm static services. It contains:
+```js
+import {
+  component,
+  directive,
+  filter,
+  View,
+  useJQuery,
+  createStore,
+  createAsyncComponent,
+} from 'jqvm'
+```
+
+Or in browser:
+
+```js
+const {
+  component,
+  directive,
+  filter,
+  View,
+  useJQuery,
+  createStore,
+  createAsyncComponent,
+} = window.jqvm
+```
 
 - component(name:string, compile:function, affect:function): global component register function
 - directive(name:string, compile:function, affect:function): global directive register function
 - filter(name:string, formatter:function): global filter register function
 - View: view constructor
+- useJQuery: you can use another version jquery by invoke this
 
 ### $.fn.vm
 
@@ -246,7 +271,7 @@ directive(name:string, compile:function, affect:function)
 - affect($el, attrs): do some side effects after whole template have been compiled, should return a function to abolish side effects, will be invoke after each compilation
 
 ```js
-const { directive } = $.vm
+const { directive } = window.jqvm
 
 directive('jq-link', function(el, attrs) {
   const link = attrs['jq-link']
@@ -342,7 +367,7 @@ component(name:string, view:View)
 - view: another view created by $.fn.vm
 
 ```js
-const { component } = $.vm
+const { component } = window.jqvm
 
 const icon = $(`<i class="icon icon-{{type}}"></i>`)
   .vm(() => ({ type: 'eye' })) // notice here, you should use a function to return initState
@@ -440,7 +465,7 @@ To share state among components, you may use a store to maintain the shared stat
 
 ```js
 // create store and share it between two components by passing `store` into `.vm(store)`
-const { createStore } = $.vm
+const { createStore } = window.jqvm
 const store = createStore({ count: 10 })
 const componentA = $('<span>{{count}}</span>')
   .vm(store)
@@ -499,6 +524,30 @@ $('#app').vm({ loading: true })
 ```
 
 Or you can use AMD Module system to create a single component as a module to load, so that you can split your code easily.
+
+## Router
+
+Display section based on window.location. Using built in components `jq-navigator` `jq-route` `jq-link`:
+
+```html
+<template id="app">
+  <jq-navigator mode="#">
+    <jq-route match="/" exact="true">
+      <div class="home">Home</div>
+    </jq-route>
+    <jq-route match="/article/:id">
+      <my-article id="{{id}}"></my-artcile>
+    </jq-route>
+  </jq-navigator>
+</template>
+
+<template id="article">
+  <article class="article">
+    <h1>{{title}}</h1>
+    <main>{{content | html}}</main>
+  </article>
+</template>
+```
 
 ## :see_no_evil: License
 

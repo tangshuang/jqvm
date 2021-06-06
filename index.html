@@ -114,7 +114,7 @@
     <script src="dist/jqvm.js"></script>
 
     <script>
-      $.vm.component('football', function($el, attrs) {
+      window.jqvm.component('football', function($el, attrs) {
         const { color } = attrs
         return `<span style="color:${color}">football</span>`
       })
@@ -324,7 +324,7 @@
       </div>
     </template>
     <script>
-      const { createStore } = $.vm
+      const { createStore } = window.jqvm
       const store = createStore({
         name: 'tomy',
         age: 10,
@@ -352,7 +352,7 @@
       <my-async></my-async>
     </template>
     <script>
-      const { createAsyncComponent } = $.vm
+      const { createAsyncComponent } = window.jqvm
       $('#async-component')
         .vm({ loading: true })
         .component('my-async', createAsyncComponent(
@@ -365,5 +365,28 @@
     </script>
 
     <div class="line"></div>
+
+    <h2>Router</h2>
+    <template id="router-app">
+      <jq-navigator mode="#">
+        <jq-route match="/home">
+          <div>Home</div>
+        </jq-route>
+        <jq-route match="/some">
+          <div>Some</div>
+        </jq-route>
+        <jq-link to="/home">go home</jq-link>
+        <jq-link to="/some">go some</jq-link>
+      </jq-navigator>
+    </template>
+    <script type="module">
+      const { createNavigator, createRoute, createLink } = window.jqvm
+      $('#router-app').vm({})
+        .component('jq-navigator', ...createNavigator({ route: 'jq-route', link: 'jq-link' }))
+        .component('jq-route', ...createRoute())
+        .component('jq-link', ...createLink())
+        .mount()
+    </script>
+
   </body>
 </html>
