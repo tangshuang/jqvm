@@ -372,11 +372,11 @@
         <jq-route match="/home">
           <div>Home</div>
         </jq-route>
-        <jq-route match="/some">
-          <div>Some</div>
+        <jq-route match="/article/:id">
+          <div>Article: {{id}}</div>
         </jq-route>
         <jq-link to="/home">go home</jq-link>
-        <jq-link to="/some">go some</jq-link>
+        <jq-link to="/article/123">go article</jq-link>
       </jq-navigator>
     </template>
     <script type="module">
@@ -385,6 +385,50 @@
         .component('jq-navigator', ...createNavigator({ route: 'jq-route', link: 'jq-link' }))
         .component('jq-route', ...createRoute())
         .component('jq-link', ...createLink())
+        .mount()
+    </script>
+
+    <div class="line"></div>
+
+    <h2>Slot</h2>
+    <template id="slot">
+      <my-box>
+        <div>{{title}}</div>
+      </my-box>
+      <button jq-on="click:change">change</button>
+    </template>
+    <script>
+      const box = $(`
+        <div>
+          <span>mybox: </span>
+          <slot></slot>
+        </div>
+      `).vm({})
+      $('#slot').vm({ title: 'slot title' })
+        .component('my-box', box)
+        .fn('change', state => state.title = 'title changed')
+        .mount()
+    </script>
+
+    <div class="line"></div>
+
+    <h2>Static</h2>
+    <template id="static">
+      <div>static content:</div>
+      <jq-static>
+        <div>{{content}}</div>
+      </jq-static>
+      <button jq-on="click:change">change</button>
+      <button jq-on="click:operate">operate</button>
+    </template>
+    <script>
+      $('#static')
+        .vm({ content: 'The content will never change. You can operate it by jquery' })
+        .fn('change', state => state.content = 'content in static changed')
+        .fn('operate', function() {
+          const box = this.find('jq-static div')
+          box.text('content changed by jquery')
+        })
         .mount()
     </script>
 

@@ -10,6 +10,7 @@ let vmId = 0
 let $ = null
 export function View() {}
 const SYMBOL = {}
+const SLOT = {}
 
 // ---------------
 
@@ -20,7 +21,7 @@ const globalFilters = {}
 function _push(list, name, compile, affect) {
   for (let i = 0, len = list.length; i < len; i ++) {
     const item = list[i]
-    if (item.name === name) {
+    if (item[0] === name) {
       list[i] = [name, compile, affect]
       return
     }
@@ -121,6 +122,15 @@ function compile($root, components, directives, state, view, [template, scope]) 
       }
 
       const record = { affect, attrs, component, state, els }
+
+      const html = $el.html()
+      if (html.trim()) {
+        const $slot = $('<div />').html(html)
+        interpolate($slot, scope)
+        const slot = $slot.html()
+        record.slot = slot
+      }
+
       els.forEach(el => el.__jQvmCompiledRecord = record)
       records.push(record)
     }
@@ -391,11 +401,17 @@ function affect($root, scope, view) {
             outside[key] = exp
           }
         })
-
         component.update(outside, SYMBOL)
+
+        if (record.slot) {
+          const { slot } = record
+          component.component('slot', () => slot)
+          component.update(true)
+        }
+
         if (!el.__jQvmComponent) {
-          component.mount($el)
           el.__jQvmComponent = component
+          component.mount($el)
         }
 
         // let attrs has the result so that we can use them in effects
@@ -548,6 +564,10 @@ function vm(initState) {
       return
     }
 
+    if (!shouldUpdate()) {
+      return
+    }
+
     const $root = getMountNode()
 
     prepare($root)
@@ -596,6 +616,14 @@ function vm(initState) {
     let flag = true
     const prevent = () => flag = false
     $root.trigger('$change', [e, prevent])
+    return flag
+  }
+
+  function shouldUpdate() {
+    const $root = getMountNode()
+    let flag = true
+    const prevent = () => flag = false
+    $root.trigger('$update', [state, prevent])
     return flag
   }
 
@@ -693,8 +721,8 @@ function vm(initState) {
     delete root.__jQvmCompiledRecords
   }
 
-  function update(nextState, isOutside) {
-    if (isOutside === SYMBOL) {
+  function update(nextState, type) {
+    if (type === SYMBOL) {
       if (state) {
         assignOutsideState(state, nextState)
       }
@@ -1032,6 +1060,13 @@ directive('jq-on', null, function($el, attrs) {
   view.on(event, path, f)
   return () => view.off(event, path, f)
 })
+
+component(
+  'jq-static',
+  () => $('<template><slot></slot></template>')
+    .vm({})
+    .on('$update', () => (_, e, prevent) => prevent())
+)
 
 // --------------------------------
 
