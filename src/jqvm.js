@@ -10,7 +10,6 @@ let vmId = 0
 let $ = null
 export function View() {}
 const SYMBOL = {}
-const SLOT = {}
 
 // ---------------
 
@@ -66,7 +65,6 @@ function prepare($root) {
 function compile($root, components, directives, state, view, [template, scope]) {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
-  const instances = root.__jQvmComponentInstances = root.__jQvmComponentInstances || []
 
   const $element = $(`<div />`).html(template)
 
@@ -95,15 +93,40 @@ function compile($root, components, directives, state, view, [template, scope]) 
     })
   }
 
-  const createIterator = (onCompile, affect, isComp) => function(index) {
+  const instances = root.__jQvmComponentInstances = root.__jQvmComponentInstances || []
+  const createIterator = (onCompile, onAffect) => function(index) {
     const el = this
     const $el = $(el)
     const attrs = getNodeAttrs(this)
     const name = getNodeName(this)
+    const els = [el]
 
-    let els = [el]
+    const inner = $el.html()
+    const slot = {
+      template: inner,
+      nodes: (($root) => {
+        const nodes = compile($root, components, directives, state, view, [inner, scope])
+        affect($root, scope)
+        return nodes
+      })($('<div />')),
+    }
 
-    const attachComponent = (component) => {
+    const record = { affect: onAffect, attrs, els, slot }
+
+    const useComponent = (view) => {
+      let instance = instances.find(item => item.name === name && item.index === index)
+      if (!instance) {
+        const component = view.clone()
+        instance = { name, index, component }
+        instances.push(instance)
+      }
+
+      const { component } = instance
+
+      record.component = component
+      record.name = name
+      record.state = state
+
       // replace component tag
       if (component.tag !== 'template') {
         const { tag, attributes } = component
@@ -118,55 +141,19 @@ function compile($root, components, directives, state, view, [template, scope]) 
         })
         $tag.attr(attrs)
         $el.replaceWith([$commentBegin, $tag, $commentEnd])
-        els = [$tag[0]]
-      }
-
-      const record = { affect, attrs, component, state, els }
-
-      const html = $el.html()
-      if (html.trim()) {
-        const $slot = $('<div />').html(html)
-        interpolate($slot, scope)
-        const slot = $slot.html()
-        record.slot = slot
-      }
-
-      els.forEach(el => el.__jQvmCompiledRecord = record)
-      records.push(record)
-    }
-
-    const generateComponent = (view) => {
-      let component = null
-
-      const instance = instances.find(item => item.name === name && item.index === index)
-      if (instance) {
-        component = instance.component
+        els.length = 0
+        els.push($commentBegin[0], $tag[0], $commentEnd[0])
       }
       else {
-        component = view.clone()
-        const item = { name, index, component }
-        instances.push(item)
-      }
-
-      return component
-    }
-
-    if (isComp) {
-      const instance = instances.find(item => item.name === name && item.index === index)
-      if (instance && instance.component) {
-        attachComponent(instance.component)
-        return
+        $el.empty() // clear inner content, which has been recorded into record.slot
       }
     }
 
     // register a view as component
-    if (isComp && onCompile instanceof View) {
-      const component = generateComponent(onCompile)
-      attachComponent(component)
-      return
+    if (onCompile instanceof View) {
+      useComponent(onCompile)
     }
-
-    if (typeof onCompile === 'function') {
+    else if (typeof onCompile === 'function') {
       // developers can recompile inside fn
       const ctx = {
         scope,
@@ -174,34 +161,55 @@ function compile($root, components, directives, state, view, [template, scope]) 
         compile: compile.bind(null, $root, components, directives, state, view),
         interpolate,
       }
-      const output = onCompile.call(ctx, $el, attrs)
+      const output = onCompile.call(ctx, $el, attrs, slot)
 
-      if (isComp && output && output instanceof View) {
-        const component = generateComponent(output)
-        attachComponent(component)
-        return
+      if (output && output instanceof View) {
+        useComponent(output)
       }
-
-      if (!isNone(output) && $el !== output) {
-        const $newEls = $(output)
+      else if (!isNone(output) && $el !== output) {
+        const $newEls = $('<div />').html(output)[0].childNodes
         $el.replaceWith($newEls)
-        els = [...$newEls]
+        els.length = 0
+        els.push(Array.from($newEls, $el => $el[0]))
       }
     }
 
-    const record = { affect, attrs, els }
     records.push(record)
     els.forEach(el => el.__jQvmCompiledRecord = record)
   }
-
   components.forEach(([name, compile, affect]) => {
     const $els = $element.find(name)
-    $els.each(createIterator(compile, affect, true))
+    $els.each(createIterator(compile, affect))
   })
 
-  directives.forEach(([name, compile, affect]) => {
+  directives.forEach(([name, onCompile, onAffect]) => {
     const $els = $element.find(`[${name}]`)
-    $els.each(createIterator(compile, affect))
+    $els.each(function() {
+      const el = this
+      const $el = $(el)
+      const attrs = getNodeAttrs(this)
+
+      let els = [el]
+      if (typeof onCompile === 'function') {
+        // developers can recompile inside fn
+        const ctx = {
+          scope,
+          view,
+          compile: compile.bind(null, $root, components, directives, state, view),
+          interpolate,
+        }
+        const output = onCompile.call(ctx, $el, attrs)
+        if (!isNone(output) && $el !== output) {
+          const $newEls = $(output)
+          $el.replaceWith($newEls)
+          els = [...$newEls]
+        }
+      }
+
+      const record = { affect: onAffect, attrs, els }
+      records.push(record)
+      els.forEach(el => el.__jQvmCompiledRecord = record)
+    })
   })
 
   interpolate($element, scope)
@@ -362,15 +370,17 @@ function affect($root, scope, view) {
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   records.forEach((record) => {
-    const { affect, attrs, component, state, els } = record
+    const { affect, attrs, component, els } = record
 
     if (component) {
+      const { state, slot } = record
       els.forEach((el) => {
-        if (!$(document).find(el).length) {
+        if (el.nodeName.indexOf('#') === 0) {
           return
         }
 
         const $el = $(el)
+
         const outside = {}
         each(attrs, (exp, attr) => {
           if (attr.indexOf(':') === 0) {
@@ -396,26 +406,31 @@ function affect($root, scope, view) {
               }
             }
           }
-          else {
+          else if (attr.indexOf('_') !== 0) {
             const key = camelCase(attr)
             outside[key] = exp
           }
         })
         component.update(outside, SYMBOL)
 
-        if (record.slot) {
-          const { slot } = record
-          component.component('slot', () => slot)
-          component.update(true)
-        }
+        component.component('slot', () => {
+          if (slot.template) {
+            const nodes = slot.nodes
+            return nodes
+          }
+          return ''
+        })
 
         if (!el.__jQvmComponent) {
           el.__jQvmComponent = component
           component.mount($el)
         }
+        else if (slot.template) {
+          component.update(true)
+        }
 
         // let attrs has the result so that we can use them in effects
-        attrs.$attrs = outside
+        attrs._attrs = outside
       })
 
       // remove no use info
@@ -769,6 +784,14 @@ function vm(initState) {
     const fn = info.pop()
 
     const action = function(e, ...params) {
+      // stop broadcast the event
+      if (e.handleObj.origType.indexOf('$') === 0) {
+        e.stopPropagation()
+        if (e.target !== e.currentTarget) {
+          return
+        }
+      }
+
       const handle = fn.call(view, state)
       const res = isFunction(handle) ? handle.call(this, e, ...params) : null
       return res
@@ -1065,7 +1088,9 @@ component(
   'jq-static',
   () => $('<template><slot></slot></template>')
     .vm({})
-    .on('$update', () => (_, e, prevent) => prevent())
+    .on('$update', () => (e, state, prevent) => {
+      prevent()
+    })
 )
 
 // --------------------------------

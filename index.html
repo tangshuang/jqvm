@@ -14,6 +14,10 @@
         margin: 40px 0;
       }
     </style>
+
+    <!-- <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script> -->
+    <script src="https://unpkg.com/jquery@1.12.4/dist/jquery.js"></script>
+    <script src="dist/jqvm.js"></script>
   </head>
   <body>
     <template id="app" attrs="{ class: 'app', style: 'color: #666' }">
@@ -72,10 +76,6 @@
       </section>
 
       <section>
-        <football color="#dd2311"></football>
-      </section>
-
-      <section>
         <div jq-hash="keep">
           {{keep}}
           <button data-change-by-hash>change keep</button>
@@ -98,27 +98,7 @@
       <button jq-on="click:refresh(2)">refresh (wait)</button>
     </template>
 
-    <div class="line"></div>
-
-    <template id="component">
-      <div>
-        <span jq-if="show">Use View as a component:</span>
-        <button jq-on="click:toggle">toggle text</button>
-      </div>
-      <div>color: {{color}}</div>
-      <my-dog name="lisa" :age="4" @change="change(4)"></my-dog>
-    </template>
-
-    <!-- <script src="https://unpkg.com/jquery/dist/jquery.min.js"></script> -->
-    <script src="https://unpkg.com/jquery@1.12.4/dist/jquery.js"></script>
-    <script src="dist/jqvm.js"></script>
-
     <script>
-      window.jqvm.component('football', function($el, attrs) {
-        const { color } = attrs
-        return `<span style="color:${color}">football</span>`
-      })
-
       $('#app')
         .vm({
           btnType: 'test',
@@ -201,7 +181,85 @@
           setTimeout(() => state.content = Date.now(), 1000 * +delay)
         })
         .mount()
+    </script>
 
+    <div class="line"></div>
+
+    <template id="missing-path-test">
+      <div jq-if="!src">loading</div>
+      <img jq-src="src" jq-if="src" width="400" height="auto" />
+    </template>
+
+    <script>
+      $('#missing-path-test').vm({
+        src: '',
+      })
+      .on('$mount', state => {
+        setTimeout(() => {
+          state.src = 'https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/510063b180ff4ca5a30fb86e79d15f50~tplv-k3u1fbpfcp-watermark.image'
+        }, 3000)
+      })
+      .mount()
+    </script>
+
+    <div class="line"></div>
+
+    <template id="prevent-update">
+      <div>content never changed by prevent in $change</div>
+      <div>{{title}}</div>
+      <button jq-on="click:handleChange">change</button>
+    </template>
+    <script>
+      $('#prevent-update').vm({ title: 'old title' })
+        .fn('handleChange', state => state.title = 'new title')
+        .on('$change', () => (e, data, prevent) => {
+          console.log(data)
+          prevent()
+        })
+        .mount()
+    </script>
+
+    <div class="line"></div>
+    <template id="football">
+      <football color="#dd2311"></football>
+    </template>
+    <script>
+      window.jqvm.component('football', function($el, attrs) {
+        const { color } = attrs
+        return `<span style="color:${color}">football</span>`
+      })
+      $('#football').vm({})
+        .mount()
+    </script>
+
+    <div class="line"></div>
+
+    <template id="simple-component">
+      <icon type="{{type}}"></icon>
+    </template>
+    <script>
+      $('#simple-component').vm({ type: 'search' })
+        .component('icon', function($el, attrs) {
+          const { type } = attrs
+          return 'icon: ' + type
+        })
+        .mount()
+    </script>
+
+    <div class="line"></div>
+
+    <h2>Component</h2>
+
+    <template id="component">
+      <div>
+        <span jq-if="show">Use View as a component:</span>
+        <button jq-on="click:toggle">toggle text</button>
+      </div>
+      <div>color: {{color}}</div>
+      <my-dog name="lisa" :age="4" @change="change(4)"></my-dog>
+    </template>
+
+    <script>
       const component = $(`
         <template>
           <div>name: {{name}}</div>
@@ -234,7 +292,7 @@
 
     <template id="hoist">
       <div>hoisted component</div>
-      <my-box :count="count"></my-box>
+      <hoist-box :count="count"></hoist-box>
       <button jq-on="click:plus">plus</button>
     </template>
     <script>
@@ -242,7 +300,7 @@
         .vm({
           count: 0,
         })
-        .component('my-box',
+        .component('hoist-box',
           $(`
             <span>
               <span>{{count}}</span>
@@ -268,40 +326,6 @@
         .vm({ loading: true })
         .fn('load', state => state.loading = !state.loading)
         .component('if-comp', $(`<span>Loaded {{content}}</span>`).vm({ content: 'Content' }))
-        .mount()
-    </script>
-
-    <div class="line"></div>
-
-    <template id="missing-path-test">
-      <div jq-if="!src">loading</div>
-      <img jq-src="src" jq-if="src" width="400" height="auto" />
-    </template>
-
-    <script>
-      $('#missing-path-test').vm({
-        src: '',
-      })
-      .on('$mount', state => {
-        setTimeout(() => {
-          state.src = 'https://p6-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/510063b180ff4ca5a30fb86e79d15f50~tplv-k3u1fbpfcp-watermark.image'
-        }, 3000)
-      })
-      .mount()
-    </script>
-
-    <template id="prevent-update">
-      <div>{{title}}</div>
-      <button jq-on="click:handleChange">change</button>
-    </template>
-
-    <script>
-      $('#prevent-update').vm({ title: 'old title' })
-        .fn('handleChange', state => state.title = 'new title')
-        .on('$change', () => (e, data, prevent) => {
-          console.log(data)
-          prevent()
-        })
         .mount()
     </script>
 
@@ -417,11 +441,13 @@
       <div>static content:</div>
       <jq-static>
         <div>{{content}}</div>
+        <inner-box></inner-box>
       </jq-static>
       <button jq-on="click:change">change</button>
       <button jq-on="click:operate">operate</button>
     </template>
     <script>
+      window.__debug = true
       $('#static')
         .vm({ content: 'The content will never change. You can operate it by jquery' })
         .fn('change', state => state.content = 'content in static changed')
@@ -429,6 +455,15 @@
           const box = this.find('jq-static div')
           box.text('content changed by jquery')
         })
+        .component(
+          'inner-box',
+          $('<template><span>{{count}}</span><button jq-on="click:add">add</button></template>')
+            .vm({ count: 0 })
+            .fn('add', state => {
+              state.count ++
+              console.log('hinnnnt')
+            })
+        )
         .mount()
     </script>
 
