@@ -714,6 +714,37 @@ redirect的值和jq-link的to一致。
 
 和jq-route一样，也可以脱离jq-navigator使用。
 
+## slot
+
+你可以通过slot来实现内容穿越。简单说，你在组件内模板中使用`<slot></slot>`，那么当你在外面使用该组件时，可以让组件渲染结果包含传递结果。举个例子：
+
+我们在组件内如此定义模板：
+
+```html
+<template>
+  <article>
+    <h1>{{title}}</h1>
+    <div><slot></slot></div>
+  </article>
+</template>
+```
+
+在外部这样使用组件：
+
+```html
+<my-article title="文章标题">文章内容</my-article>
+```
+
+此时，`<slot></slot>`将被替换为"文章内容"。
+
+在外部传递内容为外部编译的结果。例如：
+
+```html
+<my-article title="标题">内容：{{content}}</my-article>
+```
+
+此时，`content`为外部vm中state的content属性值，而非组件内的state属性值。但是，在不同的组件中，这一效果会稍有不同，部分组件的编译逻辑不同，会同时使组件内和组件外的state对传递的内容生效，这根据组件的开发者自己决定。
+
 ## :see_no_evil: 开源协议
 
 MIT.

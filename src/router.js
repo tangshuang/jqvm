@@ -238,12 +238,12 @@ export function createNavigator({ route, link }) {
 }
 
 export function createRoute() {
-  const compile = function($el, attrs) {
-    const { scope, interpolate } = this
+  const compile = function($el, attrs, slot) {
+    const { scope } = this
     const polate = (wantPath, wantSearch, pathname, search) => {
       const params = genParams(wantPath, wantSearch, pathname, search)
       const subscope = scope.$new(params)
-      interpolate($el, subscope)
+      return slot.compile(subscope)
     }
 
     const { match, exact, redirect, mode = '/' } = attrs
@@ -257,7 +257,7 @@ export function createRoute() {
           return `<!-- ${getNodeName($el[0])} ${createAttrsText(attrs)} (redirect) -->`
         }
 
-        polate(wantPath, wantSearch, pathname, search)
+        return polate(wantPath, wantSearch, pathname, search)
       }
       return `<!-- ${getNodeName($el[0])} ${createAttrsText(attrs)} (hidden) -->`
     }
@@ -272,8 +272,7 @@ export function createRoute() {
           return `<!-- ${getNodeName($el[0])} ${createAttrsText(attrs)} (redirect) -->`
         }
 
-        polate(wantPath, wantSearch, pathname, search)
-        return
+        return polate(wantPath, wantSearch, pathname, search)
       }
       return `<!-- ${getNodeName($el[0])} ${createAttrsText(attrs)} (hidden) -->`
     }
@@ -290,7 +289,7 @@ export function createRoute() {
           return `<!-- ${getNodeName($el[0])} ${createAttrsText(attrs)} (redirect) -->`
         }
 
-        polate(wantPath, wantSearch, pathname, search)
+        return polate(wantPath, wantSearch, pathname, search)
       }
       return `<!-- ${getNodeName($el[0])} ${createAttrsText(attrs)} (hidden) -->`
     }
@@ -348,7 +347,8 @@ export function createRoute() {
 }
 
 export function createLink() {
-  const compile = function($el, attrs) {
+  const compile = function($el, attrs, slot) {
+    const { scope } = this
     const { to, mode = '/', replace, open, ...attributes } = attrs
     const createLink = (target) => {
       const attrsText = createAttrsText(attributes)
@@ -362,7 +362,8 @@ export function createLink() {
         link += ' target="_blank"'
       }
 
-      link += '>' + $el.html() + '</a>'
+      const inner = $('<div />').html(slot.compile(scope)).html()
+      link += '>' + inner + '</a>'
 
       return link
     }

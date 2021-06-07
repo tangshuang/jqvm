@@ -104,11 +104,14 @@ function compile($root, components, directives, state, view, [template, scope]) 
     const inner = $el.html()
     const slot = {
       template: inner,
-      nodes: (($root) => {
-        const nodes = compile($root, components, directives, state, view, [inner, scope])
+      nodes: [...el.childNodes],
+      compile: (locals) => {
+        const $root = $('<div />')
+        const subScope = locals ? locals instanceof ScopeX ? scope.$new(locals.data) : scope.$new(locals) : scope
+        const nodes = compile($root, components, directives, state, view, [inner, subScope])
         affect($root, scope)
         return nodes
-      })($('<div />')),
+      },
     }
 
     const record = { affect: onAffect, attrs, els, slot }
@@ -268,12 +271,38 @@ function diffAndPatch($root, nodes) {
     transferRecord(current, next)
 
     // dont diff component inner content
-    if (current.__jQvmComponent && current.nodeName === next.nodeName) {
-      return
-    }
+    if (current.__jQvmComponent) {
+      if (
+        current.nodeName === next.nodeName
+        && currentAttrs['jq-vm'] === nextAttrs['jq-vm']
+      ) {
+        return
+      }
 
-    if (!next.childNodes) {
-      return
+      if (
+        current.nodeName === next.nodeName
+        && (currentAttrs['id'] || nextAttrs['id'])
+        && currentAttrs['id'] === nextAttrs['id']
+      ) {
+        return
+      }
+
+      if (
+        current.nodeName === next.nodeName
+        && (currentAttrs['data-id'] || nextAttrs['data-id'])
+        && currentAttrs['data-id'] === nextAttrs['data-id']
+      ) {
+        return
+      }
+
+      const ignoreAttrs = ['style', 'class', 'jq-vm']
+      if (
+        current.nodeName === next.nodeName
+        && $current.attr('data-hoist') === $current.attr('data-hoist')
+        && isEqual(currentAttrNames.filter(item => !ignoreAttrs.includes(item)), nextAttrNames.filter(item => !ignoreAttrs.includes(item)))
+      ) {
+        return
+      }
     }
 
     const nextChildren = [...next.childNodes]
@@ -334,7 +363,6 @@ function diffAndPatch($root, nodes) {
       // diff and patch element
       else if (next.nodeName.indexOf('#') !== 0) {
         diffAndPatchNode($current, $next)
-        transferRecord(current, next)
       }
       // diff and patch text
       else {
@@ -413,9 +441,10 @@ function affect($root, scope, view) {
         })
         component.update(outside, SYMBOL)
 
-        component.component('slot', () => {
+        component.component('slot', function() {
+          const { scope } = this
           if (slot.template) {
-            const nodes = slot.nodes
+            const nodes = slot.compile(scope)
             return nodes
           }
           return ''
