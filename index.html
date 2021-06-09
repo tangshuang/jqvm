@@ -390,6 +390,37 @@
 
     <div class="line"></div>
 
+    <h2>Router</h2>
+    <template id="router-app">
+      <jq-navigator mode="#">
+        <jq-route match="/home">
+          <div>Home</div>
+        </jq-route>
+        <jq-route match="/article/:id">
+          <div>Article: {{id}}</div>
+        </jq-route>
+        <jq-route match="/page1">
+          <page1 title="Page 1">This is content of page 1</page1>
+        </jq-route>
+        <jq-route match="/page2">
+          <page2 title="Page 2" content="This is content of page 2">inner content will not work</page2>
+        </jq-route>
+        <jq-link to="/home">home</jq-link>
+        <jq-link to="/article/123">article</jq-link>
+        <jq-link to="/page1">page1</jq-link>
+        <jq-link to="/page2">page2</jq-link>
+      </jq-navigator>
+    </template>
+    <script type="module">
+      const { createNavigator, createRoute, createLink, createAsyncComponent } = window.jqvm
+      $('#router-app').vm({})
+        .component('page1', createAsyncComponent(() => import('./.demo/pages/page1.js')))
+        .component('page2', createAsyncComponent(() => import('./.demo/pages/page2.js')))
+        .mount()
+    </script>
+
+    <div class="line"></div>
+
     <h2>Slot</h2>
     <template id="slot">
       <my-box>

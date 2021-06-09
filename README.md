@@ -525,6 +525,30 @@ $('#app').vm({ loading: true })
 
 Or you can use AMD Module system to create a single component as a module to load, so that you can split your code easily.
 
+## Router
+
+Display section based on window.location. Using built in components `jq-navigator` `jq-route` `jq-link`:
+
+```html
+<template id="app">
+  <jq-navigator mode="#">
+    <jq-route match="/" exact="true">
+      <div class="home">Home</div>
+    </jq-route>
+    <jq-route match="/article/:id">
+      <my-article id="{{id}}"></my-artcile>
+    </jq-route>
+  </jq-navigator>
+</template>
+
+<template id="article">
+  <article class="article">
+    <h1>{{title}}</h1>
+    <main>{{content | html}}</main>
+  </article>
+</template>
+```
+
 ## :see_no_evil: License
 
 MIT.
