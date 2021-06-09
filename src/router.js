@@ -243,7 +243,7 @@ export function createRoute() {
     const polate = (wantPath, wantSearch, pathname, search) => {
       const params = genParams(wantPath, wantSearch, pathname, search)
       const subscope = scope.$new(params)
-      return slot.compile(subscope)
+      return slot(subscope)
     }
 
     const { match, exact, redirect, mode = '/' } = attrs
@@ -362,7 +362,7 @@ export function createLink() {
         link += ' target="_blank"'
       }
 
-      const inner = $('<div />').html(slot.compile(scope)).html()
+      const inner = $('<div />').html(slot(scope)).html()
       link += '>' + inner + '</a>'
 
       return link
