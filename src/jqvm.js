@@ -102,17 +102,15 @@ function compile($root, components, directives, state, view, [template, scope]) 
     const els = [el]
 
     const inner = $el.html()
-    const slot = {
-      template: inner,
-      nodes: [...el.childNodes],
-      compile: (locals) => {
-        const $root = $('<div />')
-        const subScope = locals ? locals instanceof ScopeX ? scope.$new(locals.data) : scope.$new(locals) : scope
-        const nodes = compile($root, components, directives, state, view, [inner, subScope])
-        affect($root, scope)
-        return nodes
-      },
+    const slot = (locals) => {
+      const $root = $('<div />')
+      const subScope = locals ? locals instanceof ScopeX ? scope.$new(locals.data) : scope.$new(locals) : scope
+      const nodes = compile($root, components, directives, state, view, [inner, subScope])
+      affect($root, scope)
+      return nodes
     }
+    slot.template = inner
+    slot.nodes = [...el.childNodes]
 
     const record = { affect: onAffect, attrs, els, slot }
 
@@ -441,10 +439,12 @@ function affect($root, scope, view) {
         })
         component.update(outside, SYMBOL)
 
+        const slotInner = slot.template.trim()
+
         component.component('slot', function() {
           const { scope } = this
-          if (slot.template) {
-            const nodes = slot.compile(scope)
+          if (slotInner) {
+            const nodes = slot(scope)
             return nodes
           }
           return ''
@@ -454,7 +454,7 @@ function affect($root, scope, view) {
           el.__jQvmComponent = component
           component.mount($el)
         }
-        else if (slot.template) {
+        else if (slotInner) {
           component.update(true)
         }
 
