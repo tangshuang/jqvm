@@ -393,7 +393,8 @@
     <h2>Slot</h2>
     <template id="slot">
       <my-box>
-        <div>{{title}}</div>
+        <div jq-if="title == '111'">{{title + '111'}}</div>
+        <div jq-if="title != '111'">{{title}}</div>
       </my-box>
       <button jq-on="click:change">change</button>
     </template>
@@ -406,7 +407,7 @@
       `).vm({})
       $('#slot').vm({ title: 'slot title' })
         .component('my-box', box)
-        .fn('change', state => state.title = 'title changed')
+        .fn('change', state => state.title = '111')
         .mount()
     </script>
 
@@ -423,7 +424,6 @@
       <button jq-on="click:operate">operate</button>
     </template>
     <script>
-      window.__debug = true
       $('#static')
         .vm({ content: 'The content will never change. You can operate it by jquery' })
         .fn('change', state => state.content = 'content in static changed')

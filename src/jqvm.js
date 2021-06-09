@@ -168,10 +168,10 @@ function compile($root, components, directives, state, view, [template, scope]) 
         useComponent(output)
       }
       else if (!isNone(output) && $el !== output) {
-        const $newEls = $('<div />').html(output)[0].childNodes
-        $el.replaceWith($newEls)
+        const newEls = $('<div />').html(output)[0].childNodes
+        $el.replaceWith(newEls)
         els.length = 0
-        els.push(Array.from($newEls, $el => $el[0]))
+        els.push(...newEls)
       }
     }
 
@@ -179,6 +179,9 @@ function compile($root, components, directives, state, view, [template, scope]) 
     els.forEach(el => el.__jQvmCompiledRecord = record)
   }
   components.forEach(([name, compile, affect]) => {
+    if (name === 'slot') {
+      return
+    }
     const $els = $element.find(name)
     $els.each(createIterator(compile, affect))
   })
@@ -214,6 +217,14 @@ function compile($root, components, directives, state, view, [template, scope]) 
   })
 
   interpolate($element, scope)
+
+  // slot will only render with the host scope
+  const slotComponent = components.find(item => item[0] === 'slot')
+  if (slotComponent) {
+    const [name, compile, affect] = slotComponent
+    const $els = $element.find(name)
+    $els.each(createIterator(compile, affect))
+  }
 
   const nodes = [...$element[0].childNodes]
   return nodes
