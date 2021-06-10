@@ -1,0 +1,16 @@
+{
+  "name": "jqvm-loader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "jqvm-loader.js",
+  "scripts": {
+    "build": "webpack"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "jqvm": "^4.1.6",
+    "webpack": "^5.38.1",
+    "webpack-cli": "^4.7.2"
+  }
+}

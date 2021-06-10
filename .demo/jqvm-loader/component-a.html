@@ -1,0 +1,14 @@
+<template>
+  <h2>{{title}}</h2>
+  <main>{{content}}</main>
+</template>
+
+<script>
+  export default ($template) => $template
+    .vm(() => {
+      return {
+        title: '组件标题',
+        content: '组件内容',
+      }
+    })
+</script>

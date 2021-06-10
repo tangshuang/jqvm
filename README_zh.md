@@ -745,6 +745,53 @@ redirect的值和jq-link的to一致。
 
 此时，`content`为外部vm中state的content属性值，而非组件内的state属性值。但是，在不同的组件中，这一效果会稍有不同，部分组件的编译逻辑不同，会同时使组件内和组件外的state对传递的内容生效，这根据组件的开发者自己决定。
 
+## jqvm-loader
+
+将组件独立出来，你可以使用jqvm-loader将一个特殊写法的html文件转化为一个jqvm组件。
+在webpack中如下使用：
+
+```
+{
+  module: {
+    rules: [
+      {
+        test: /\.html$/,
+        resourceQuery: /jqvm/, // 可选的，当你使用这个规则，那么只有 import .. from './some.html?jqvm' 才走jqvm/loader编译
+        use: [
+          {
+            loader: 'babel-loader', // 这个loader的功能很简单，就是把一个html文件解析出来之后，编译为一个ESModule，这个ESModule就是一个jqvm的组件，再交给babel去进行编译。
+          },
+          {
+            loader: 'jqvm/loader',
+            options: {
+              $: true, // 可选，如果$为true，那么生成的组件代码中，不会引入jquery和jqvm，直接使用全局的$对象，如果传入一个字符串，比如'jQuery'，那么会用这个字符串作为全局变量赋值给$作为jquery的引用
+            },
+          },
+        ],
+      }
+    ]
+  }
+}
+```
+
+你可以通过webpack的能力如下实施：
+
+```js
+import { createAsyncComponent } from 'jqvm'
+const SomeComponent = createAsyncComponent(() => import('./components/some-component.html'))
+```
+
+这样既可以在html中撰写一个组件，同时又可以把这个组件代码拆分出去。
+如果你不想使用webpack，而是想把html编译成独立的js文件，可以这样：
+
+```js
+const { compile } = require('jqvm/loader')
+const content = compile(fs.readFileSync(__dirname + '/component.html'), options) // options.$ = false|true|'jQuery'
+fs.writeFileSync(.., content)
+```
+
+这样就可以获得一个独立的js文件了。
+
 ## :see_no_evil: 开源协议
 
 MIT.
