@@ -1,7 +1,6 @@
 import { useJQuery, component, directive, filter, View } from './jqvm.js'
 import { createStore } from './store.js'
 import { createAsyncComponent } from './async.js'
-import { createNavigator, createRoute, createLink } from './router.js'
 
 // use in browser
 if (typeof jQuery !== 'undefined') {
@@ -16,7 +15,4 @@ export {
   useJQuery,
   createStore,
   createAsyncComponent,
-  createNavigator,
-  createRoute,
-  createLink,
 }
