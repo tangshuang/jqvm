@@ -153,7 +153,7 @@ const {
 } = window.jqvm
 ```
 
-`jqvm`是挂载在jQuery对象上的一个静态属性，它提供了一系列的对象给你使用。其中包含了:
+`jqvm`是挂载在window对象上的一个静态属性，它提供了一系列的对象给你使用。其中包含了:
 
 - component(name:string, compile:function, affect:function): 注册全局组件
 - directive(name:string, compile:function, affect:function): 注册全局指令
@@ -465,6 +465,18 @@ this.emit(event, ...args)
 
 值得注意的是，`jq-on`和这里的组件事件完全不同，它们是两个体系。但是对于回调函数而言，它们却在用法上一致。
 
+**hoist组件**
+
+前面的组件定义方法，会让最终的渲染结果被放置在组件标签内部。例如最终渲染为`<my-tag><div>...</div></my-tag>`，如果你想让渲染结果直接替换`<my-tag>`需要怎么办呢？你需要在template上添加一个`hoist`属性，例如下面这样做：
+
+```html
+<div>
+  ...
+</div>
+```
+
+你只需要在模板中，直接使用非template作为标签，这样它就将替换组件标签`<my-tag>`完成渲染。
+
 ## :bread: 过滤器
 
 过滤器是用来在模板中处理输出结果的处理器。
@@ -496,7 +508,7 @@ import { createStore } from 'jqvm'
 或者
 
 ```js
-const { createStore } = $.vm
+const { createStore } = window.jqvm
 ```
 
 然后创建一个状态管理器：
@@ -747,8 +759,30 @@ redirect的值和jq-link的to一致。
 
 ## jqvm-loader
 
-将组件独立出来，你可以使用jqvm-loader将一个特殊写法的html文件转化为一个jqvm组件。
-在webpack中如下使用：
+利用jqvm-loader，你可以实现SFC（单文件组件），结合异步组件，你可以将一些复杂的组件拆分出去。例如，你可以这样写一个组件
+
+```html
+<template hoist>
+  <div>
+    <h2>{{title}}</h2>
+    <main>{{content}}</main>
+  </div>
+</template>
+
+<script>
+  export default ($template) => $template
+    .vm(() => {
+      return {
+        title: '组件标题',
+        content: '组件内容',
+      }
+    })
+</script>
+```
+
+template上的`hoist`表示组件将作为hoist组件，最终渲染结果中，直接用模板内容替换组件标签。如果传入hoist，那么内部只允许一个顶层标签。
+
+将这个htm/html文件放置在你的项目目录下，然后在webpack中如下使用：
 
 ```
 {
@@ -762,7 +796,7 @@ redirect的值和jq-link的to一致。
             loader: 'babel-loader', // 这个loader的功能很简单，就是把一个html文件解析出来之后，编译为一个ESModule，这个ESModule就是一个jqvm的组件，再交给babel去进行编译。
           },
           {
-            loader: 'jqvm/loader',
+            loader: 'jqvm/loader', // jqvm-loader的位置在jqvm包下面
             options: {
               $: true, // 可选，如果$为true，那么生成的组件代码中，不会引入jquery和jqvm，直接使用全局的$对象，如果传入一个字符串，比如'jQuery'，那么会用这个字符串作为全局变量赋值给$作为jquery的引用
             },

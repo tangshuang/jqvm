@@ -1,5 +1,6 @@
 function compile(content, options = {}) {
   const [_t, template] = content.match(/<template>([\s\S]+)<\/template>/m)
+  const [_t, hoist] = content.match(/<template hoist>([\s\S]+)<\/template>/m)
   const [_s, script] = content.match(/<script>([\s\S]+)<\/script>/m)
 
   const fn = script.replace(/export\s+default/, '').trim()
@@ -19,10 +20,12 @@ const $ = ${options.$}
 `
   }
 
+  const tpl = hoist ? hoist : `<template>${template}</template>`
+
   contents += `
 const fn = ${fn}
 
-const component = fn($(\`<template>${template}</template>\`))
+const component = fn($(\`${tpl}\`))
 
 export default component
 `

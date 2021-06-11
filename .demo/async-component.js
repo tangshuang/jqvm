@@ -1,5 +1,5 @@
 const template = `
-  <div data-async>
+  <div>
     <div>{{title}}</div>
     <div>{{content}}</div>
   </div>
