@@ -41,9 +41,18 @@ const $ = ${options.$}
 const fn = ${fn}
 
 const component = fn($(\`${tpl}\`))
+`
 
+  if (!options.export || options.export === 'default') {
+    contents += `
 export default component
 `
+  }
+  else {
+    contents += `
+window['${options.export}'] = component
+`
+  }
 
   return contents.trim()
 }
