@@ -4,21 +4,34 @@ function compile(content, options = {}) {
   const [_s, script] = content.match(/<script>([\s\S]+)<\/script>/m) || []
   const [_y, style] = content.match(/<style>([\s\S]+)<\/style>/m) || []
 
-  const fn = script.replace(/export\s+default/, '').trim()
-
-  const useStyle = () => {
-    if (!style) {
-      return ''
+  const lines = script.split('\n')
+  const globalScripts = []
+  const exportScripts = []
+  lines.forEach((line) => {
+    if (line.indexOf('export default') > -1) {
+      exportScripts.push(line)
     }
+    else if (exportScripts.length) {
+      exportScripts.push(line)
+    }
+    else {
+      globalScripts.push(line)
+    }
+  })
 
-    return `
-const style = document.createElement('style')
-style.textContent = \`${style}\`
-document.head.appendChild(style)
-`
-  }
+  const globalContents = globalScripts.join('\n').trim()
+  const exportContents = exportScripts.join('\n').trim()
+
+  const fn = exportContents.replace(/export\s+default/, '').trim()
+  const tpl = hoist ? hoist : `<template>${template}</template>`
 
   let contents = ''
+
+  if (globalContents) {
+    contents += `
+${globalContents}
+`
+  }
 
   if (!options.$) {
     contents += `
@@ -34,25 +47,23 @@ const $ = ${options.$}
 `
   }
 
-  contents += useStyle()
+  if (style) {
+    const css = options.css ? options.css(style) : style
+    contents += `
+const style = document.createElement('style')
+style.textContent = \`${css}\`
+document.head.appendChild(style)
+`
+  }
 
-  const tpl = hoist ? hoist : `<template>${template}</template>`
+  const t = options.template ? options.template(tpl) : tpl
   contents += `
 const fn = ${fn}
 
-const component = fn($(\`${tpl}\`))
-`
+const component = fn($(\`${t}\`), $)
 
-  if (!options.export || options.export === 'default') {
-    contents += `
 export default component
 `
-  }
-  else {
-    contents += `
-window['${options.export}'] = component
-`
-  }
 
   return contents.trim()
 }

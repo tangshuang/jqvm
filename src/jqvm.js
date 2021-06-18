@@ -495,7 +495,7 @@ function affect($root, scope, view) {
 
 // ---------------- main ---------------
 
-function vm(initState) {
+function vm(initState = {}) {
   const $template = $(this)
   const hash = $template.attr('id') || $template.attr('jq-vm-id') || (vmId ++, vmId)
   const root = `[jq-vm=${hash}]`
@@ -594,10 +594,12 @@ function vm(initState) {
     })
     scope = new ScopeX(state, { filters })
     currTick()
+
+    $template.trigger('$init')
   }
 
   function listen() {
-    $template.on('$mount', function(e) {
+    $template.on('$mount', function() {
       const $root = getMountNode()
       actions.forEach((item) => {
         const { type, info, action } = item
@@ -605,11 +607,20 @@ function vm(initState) {
       })
     })
 
-    $template.on('$unmount', (e) => {
+    $template.on('$unmount', () => {
       const $root = getMountNode()
       actions.forEach((item) => {
         const { info, action } = item
         $root.off(...info, action)
+      })
+    })
+
+    $template.one('$init', (e) => {
+      actions.forEach((item) => {
+        const { info, action } = item
+        if (info[0] === '$init') {
+          action.call(null, e)
+        }
       })
     })
   }
@@ -1127,7 +1138,7 @@ directive('jq-on', null, function($el, attrs) {
 component(
   'jq-static',
   () => $('<template><slot></slot></template>')
-    .vm({})
+    .vm()
     .on('$update', () => (e, state, prevent) => {
       prevent()
     })

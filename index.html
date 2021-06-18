@@ -116,6 +116,9 @@
           keep: 0,
           range: 0,
         })
+        .on('$init', state => {
+          console.log('init:', state)
+        })
         .on('click', '.toggle', state => state.show = !state.show)
         .on('input', '[data-title-input]', state => function(e) {
           const value = e.target.value
