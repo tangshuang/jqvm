@@ -1,11 +1,25 @@
 function compile(content, options = {}) {
-  const [_t, template] = content.match(/<template>([\s\S]+)<\/template>/m)
-  const [_t, hoist] = content.match(/<template hoist>([\s\S]+)<\/template>/m)
-  const [_s, script] = content.match(/<script>([\s\S]+)<\/script>/m)
+  const [_t, template] = content.match(/<template>([\s\S]+)<\/template>/m) || []
+  const [_h, hoist] = content.match(/<template hoist>([\s\S]+)<\/template>/m) || []
+  const [_s, script] = content.match(/<script>([\s\S]+)<\/script>/m) || []
+  const [_y, style] = content.match(/<style>([\s\S]+)<\/style>/m) || []
 
   const fn = script.replace(/export\s+default/, '').trim()
 
+  const useStyle = () => {
+    if (!style) {
+      return ''
+    }
+
+    return `
+const style = document.createElement('style')
+style.textContent = \`${style}\`
+document.head.appendChild(style)
+`
+  }
+
   let contents = ''
+
   if (!options.$) {
     contents += `
 import jQuery from 'jquery'
@@ -20,8 +34,9 @@ const $ = ${options.$}
 `
   }
 
-  const tpl = hoist ? hoist : `<template>${template}</template>`
+  contents += useStyle()
 
+  const tpl = hoist ? hoist : `<template>${template}</template>`
   contents += `
 const fn = ${fn}
 
