@@ -327,7 +327,7 @@ Here are builtin directives:
 - `jq-checked="!!exp"` only used on `input[type=checkbox]` `input[type=radio]`
 - `jq-selected="!!exp"` only used on `select > option`
 - `jq-bind="keyPath"` two way binding, only used on `input` `select` `textarea`, when user type in, the `keyPath` value of vm will be update automaticly
-- `jq-src="{{exp}}"` only used on `img`, you should always use jq-src instead of `src`
+- `jq-src="exp"` only used on `img`, you should always use jq-src instead of `src`
 - `jq-repeat` print serval times
 - `jq-on="event:fn"` bind event callback function
 
