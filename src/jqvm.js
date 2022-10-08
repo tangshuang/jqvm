@@ -905,12 +905,18 @@ function vm(initState = {}) {
   }
 
   const fns = {}
-  function fn(name, action) {
+  function fn(name, action, patch) {
     if (!action) {
       return fns[name]
     }
     else {
       fns[name] = action
+    }
+    if (patch) {
+      view[name] = (...args) => {
+        const f = action.call(view, state)
+        return f(...args)
+      }
     }
     return view
   }

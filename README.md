@@ -160,7 +160,7 @@ The return value is a `view` object which has methods:
 - component(name, compile, affect): register component only for this vm
 - directive(name, compile, affect): register directive only for this vm
 - filter(name, formatter): register formatter only for this vm
-- fn(name, action?): register a function on `view`, when you not pass `func`, it means you want to get the function, `action` is the same usage as `on`
+- fn(name, action?, patch?): register a function on `view`, when you not pass `func`, it means you want to get the function, `action` is the same usage as `on`
 
 The `mount` method can receive a selector or a jquery element.
 
@@ -176,6 +176,21 @@ $(template)
 ```
 
 When selector is passed into `mount`, the view will be rendered in the target element (replace with innerHTML). If selector is not passed, you should select a element in DOM and the view will be rendered after the selected element (as the beginning code does).
+
+`fn` define a new function on view:
+
+```js
+$(..).vm({ .. })
+  .fn('fnName', (state, ...args) => (e) => {
+    ...
+  })
+  .fn('doSome', (state) => (xx) => {
+    ...
+  }, true)
+  .on('click', '.some', function() {
+    this.doSome('xx')
+  })
+```
 
 Now, let's look into `action` detail.
 
@@ -205,7 +220,7 @@ view.on('click', '.some', action)
 
 No matter you use `fn` in view or to a component by `@`, the `action` function is the same structure.
 
-```
+```html
 <my-component @change="change(bindVar1, bindVar2)"></my-component>
 
 <script>
