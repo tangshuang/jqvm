@@ -68,7 +68,7 @@ function compile($root, components, directives, state, view, [template, scope]) 
 
   const $element = $(`<div />`).html(template)
 
-  const interpolate = ($element, scope) => {
+  const interpolate = ($element, scp = scope) => {
     $element.each(function() {
       const attrs = [...this.attributes]
       const $this = $(this)
@@ -77,17 +77,17 @@ function compile($root, components, directives, state, view, [template, scope]) 
         if (name.indexOf('@') === 0) {
           return
         }
-        const text = scope.interpolate(value)
+        const text = scp.interpolate(value)
         $this.attr(name, text)
       })
 
       const children = [...this.childNodes]
       children.forEach((child) => {
         if (child.nodeName === '#text') {
-          child.textContent = scope.interpolate(child.textContent)
+          child.textContent = scp.interpolate(child.textContent)
         }
         else if (child.nodeName.indexOf('#') !== 0) {
-          interpolate($(child), scope)
+          interpolate($(child), scp)
         }
       })
     })
@@ -106,13 +106,13 @@ function compile($root, components, directives, state, view, [template, scope]) 
       const $root = $('<div />')
       const subScope = locals ? locals instanceof ScopeX ? scope.$new(locals.data) : scope.$new(locals) : scope
       const nodes = compile($root, components, directives, state, view, [inner, subScope])
-      affect($root, scope)
+      affect($root, scope, view)
       return nodes
     }
     slot.template = inner
     slot.nodes = [...el.childNodes]
 
-    const record = { affect: onAffect, attrs, els, slot }
+    const record = { affect: onAffect, attrs, els, slot, scope }
 
     const useComponent = (view) => {
       let instance = instances.find(item => item.name === name && item.index === index)
@@ -156,10 +156,11 @@ function compile($root, components, directives, state, view, [template, scope]) 
     }
     else if (typeof onCompile === 'function') {
       // developers can recompile inside fn
+      const boundCompile = compile.bind(null, $root, components, directives, state, view)
       const ctx = {
         scope,
         view,
-        compile: compile.bind(null, $root, components, directives, state, view),
+        compile: (temp, scp = scope) => boundCompile([temp, scp]),
         interpolate,
       }
       const output = onCompile.call(ctx, $el, attrs, slot)
@@ -196,10 +197,11 @@ function compile($root, components, directives, state, view, [template, scope]) 
       let els = [el]
       if (typeof onCompile === 'function') {
         // developers can recompile inside fn
+        const boundCompile = compile.bind(null, $root, components, directives, state, view)
         const ctx = {
           scope,
           view,
-          compile: compile.bind(null, $root, components, directives, state, view),
+          compile: (temp, scp = scope) => boundCompile([temp, scp]),
           interpolate,
         }
         const output = onCompile.call(ctx, $el, attrs)
@@ -210,7 +212,7 @@ function compile($root, components, directives, state, view, [template, scope]) 
         }
       }
 
-      const record = { affect: onAffect, attrs, els }
+      const record = { affect: onAffect, attrs, els, scope }
       records.push(record)
       els.forEach(el => el.__jQvmCompiledRecord = record)
     })
@@ -407,7 +409,8 @@ function affect($root, scope, view) {
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
   records.forEach((record) => {
-    const { affect, attrs, component, els } = record
+    const { affect, attrs, component, els, scope: localScope } = record
+    const finalScope = localScope && localScope !== scope ? localScope : scope
 
     if (component) {
       const { state, slot } = record
@@ -421,7 +424,7 @@ function affect($root, scope, view) {
         const outside = {}
         each(attrs, (exp, attr) => {
           if (attr.indexOf(':') === 0) {
-            const value = scope.parse(exp)
+            const value = finalScope.parse(exp)
             const key = camelCase(attr.substring(1))
             outside[key] = value
           }
@@ -432,7 +435,7 @@ function affect($root, scope, view) {
             outside[event] = function(...args) {
               let res = null
               if (params) {
-                const args = params.map(arg => scope.parse(arg))
+                const args = params.map(arg => finalScope.parse(arg))
                 res = fn.call(view, state, ...args)
               }
               else {
@@ -485,7 +488,8 @@ function affect($root, scope, view) {
 
     els.forEach((el) => {
       const $el = $(el)
-      const revoke = affect.call({ $root, scope, view, component }, $el, attrs)
+      const ctx = { $root, scope: finalScope, view, component }
+      const revoke = affect.call(ctx, $el, attrs)
       if (typeof revoke === 'function') {
         record.revoke = revoke
       }
@@ -1030,7 +1034,7 @@ directive('jq-repeat', function($el, attrs) {
     }
     const scope = parentScope.$new(newScope)
 
-    const nodes = compile([temp, scope])
+    const nodes = compile(temp, scope)
     $els.push(...nodes)
   })
 
