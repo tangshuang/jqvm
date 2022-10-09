@@ -913,9 +913,9 @@ function vm(initState = {}) {
       fns[name] = action
     }
     if (patch) {
-      view[name] = (...args) => {
+      view[name] = function(...args) {
         const f = action.call(view, state)
-        return f(...args)
+        return f.call(this, ...args)
       }
     }
     return view

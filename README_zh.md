@@ -184,7 +184,7 @@ JQvm把`#app`内部的HTML字符串当作模板，用它们来构建界面。但
 - component(name, compile, affect): 注册组件到当前vm
 - directive(name, compile, affect): 注册指令到当前vm
 - filter(name, formatter): 注册过滤器到当前vm
-- fn(name, action?): 在当vm上定义一个名为name的函数，这个函数的形式和上面`on`的action一致。当你不传action时，表示把这个函数从vm中取出来。
+- fn(name, action, patch?): 在当vm上定义一个名为name的函数，这个函数的形式和上面`on`的action一致。
 
 接下来我们来看下mount接收参数的使用方法：
 
@@ -202,7 +202,7 @@ $(template)
 
 如果你采用了这种字符串模板的形式，那么mount的时候必须挂载到一个具体的节点。但是，如果你是基于HTML中的`<template>`标签创建模板，那么可以不用传，mount会把渲染结果挂载在对应的那个`<template>`标签后面，这样可以根据你页面中template的位置来决定布局。
 
-接下来，我们来看一下比较复杂的action具体怎么定义：
+接下来，我们来看一下比较复杂的`action`具体怎么定义：
 
 ```js
 // state: 当前vm中对应的state
@@ -269,12 +269,43 @@ $(...)
 接下来我们看下上面代码中@change内的`(var1,var2)`部分，这部分表示回调时，我们要绑定哪些当前vm中的state的属性。绑定的属性值，将会作为action函数的state之后的其他参数被使用。也就是说，state后面的其他参数，都是通过这种绑定的方式传入的，如果你没有在模板中传入()部分，那么就不会有其他参数。
 *这种绑定的方式不单单在组件的事件系统中有用，在前面的`on`事件绑定中也是生效的。*
 
+当我们使用`fn`在view上定义函数时，我们常常是为了在其他地方调用它。如果你仅仅在模板的`jq-on`中调用它，你可以不需要传`patch`，而如果你想在其他函数中调用定义好的函数，你需要传入`patch: true`，并且在调用时直接从view上读取，例如：
+
+```js
+$(...).vm(...)
+  // 传入第三个参数patch为true，该函数将被定义到view上，否则view上不存在该函数
+  .fn('check', (state) => (x) => {
+    ...
+  }, true)
+  .fn('submit', function(state){
+    return () => {
+      // 直接调用在view上定义好的check函数
+      if (this.check(100)) {
+        ...
+      }
+    }
+  })
+```
+
+不过这种调用有一个限制，即对于被定义的函数而言，不能存在给定的变量参数，例如：
+
+```js
+$(...).vm(...)
+  .fn('check', (state, var1, var2) => (x) => {
+    ...
+  }, true)
+```
+
+上面`check`函数在定义时存在`var1, var2`两个变量参数，这两个参数要求在生成函数时赋值，这就导致直接从view上读取的check函数不存在它们的值，因此，`patch`参数不能处理此类函数，此类函数仅适用于`jq-on`的回调。*当然，对于js编程来说，你可以把函数放在vm外面定义，在具体某个逻辑位置调用该函数，而不需要通过fn在view上强行定义某个函数。*
+
 除了组件的自定义的事件和DOM事件，jQvm的vm内也有一些事件，它们是：
 
 - $mount: 调用`view.mount()`时触发
 - $unmount: 调用`view.unmount()`时触发
 - $render: view的内容被完全渲染后触发
 - $change: state变化后触发
+- $init: 实例化view时被触发
+- $destroy: view被销毁时触发（仅支持手动调用view.destroy来销毁view）
 
 这些内置事件需要使用`on`来监听：
 
