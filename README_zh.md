@@ -519,6 +519,29 @@ view.filter('number', number)
 
 `|`是管道标识符，在很多系统中都有这种用法。简单说，|前面的值，将被|后面的过滤器处理，处理结果又会被再后面的过滤器处理。最后一个过滤器处理输出的结果就是最终的结果。
 
+## :construction: 插件
+
+我们可以通过view的plugin方法来完成一些复杂的集合处理，可以让我们把一些逻辑复杂的但关系紧密的操作，集合在一起，提供给view使用。你可以理解为插件就是多个view方法调用的封装。
+
+```js
+function somePlugin(view) {
+  // 返回生命周期事件的集合，在这些事件节点上，对view作统一处理
+  return {
+    $init: () => {
+      ...
+    },
+    $destroy: () => {
+      ...
+    },
+  }
+}
+
+$(...).vm({ ... })
+  .plugin(somePlugin)
+```
+
+插件本身是一个函数，接收view作为参数，返回一个以view生命周期事件（以$开头的内置事件）为key的对象，并规定对应生命周期事件要做的事情。
+
 ## 状态管理
 
 有些情况下，你不想通过props传递的方式把状态从上往下传递，你希望通过一个桥梁，方便的在多个组件之间共享状态。此时，你可以借助`createStore`来创建一个状态管理器。具体如下使用：
@@ -712,6 +735,35 @@ fs.writeFileSync(.., content)
 ```
 
 这样就可以获得一个独立的js文件了。
+
+## Router
+
+```js
+const { createRouter } = window.jqvm
+const router = createRouter({ mode: 'history' })
+
+$(`
+  <template>
+    <div jq-route="'/'">
+      home
+      <a href="/admin/{{id}}" jq-navigate="push">admin</a>
+    </div>
+    <div jq-route="/^\/admin\/\d+/">
+      admin
+      <a jq-navigate="back">back</a>
+    </div>
+  </template>
+`).vm({})
+  .plugin(router) // <-- 以插件的形式挂载路由
+  .mount('#app')
+```
+
+注意点：
+
+- `createRouter({ mode: 'history' | 'hash', baseUri: '/xxx' })`
+- `view.plugin(router)`
+- `jq-route="exp"` 用于匹配路由的指令，由于它是表达式，因此你可以传入正则表达式进行匹配
+- `jq-navigate` 用于规定路由跳转方法的指令，可选方法有：`push | replace | open | back | forward`
 
 ## :see_no_evil: 开源协议
 

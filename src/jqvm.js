@@ -943,6 +943,17 @@ function vm(initState = {}) {
     return view
   }
 
+  function plugin(fn) {
+    const lifecycle = fn.call({ view, scope }, view)
+    if (lifecycle) {
+      const events = Object.keys(lifecycle)
+      events.forEach((event) => {
+        view.on(event, lifecycle[event])
+      })
+    }
+    return view
+  }
+
   Object.assign(view, {
     once(...args) {
       bind(args, true)
@@ -965,6 +976,7 @@ function vm(initState = {}) {
     component,
     directive,
     filter,
+    plugin,
     fn,
     clone,
   })

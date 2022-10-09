@@ -12,7 +12,9 @@ export function createStore(initState, options) {
   const views = []
   return function() {
     const view = this
-    views.push(view)
+    if (views.indexOf(view) === -1) {
+      views.push(view)
+    }
     view.on('$change', () => (e, { keyPath, value }) => {
       views.forEach((item) => {
         if (item === view) {

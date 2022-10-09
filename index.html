@@ -445,5 +445,26 @@
         .mount()
     </script>
 
+    <div class="line"></div>
+
+    <h2>Router</h2>
+    <template id="router">
+      <div jq-route="'/'">
+        home
+        <a href="/admin/123" jq-navigate="push">admin</a>
+      </div>
+      <div jq-route="/^\/admin\/\d+/g">
+        admin
+        <a jq-navigate="back">back</a>
+      </div>
+    </template>
+    <script>
+      const { createRouter } = window.jqvm
+      const router = createRouter({ mode: 'history' })
+      $('#router').vm({})
+        .plugin(router)
+        .mount()
+    </script>
+
   </body>
 </html>
