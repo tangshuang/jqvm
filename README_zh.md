@@ -17,7 +17,7 @@
 
 ## :hear_no_evil:  什么是jQvm?
 
-JQvm是一个jQuery插件，同时也是一个MVVM响应式框架。它帮助熟悉jQuery的开发者实现更便捷的开发。你可能用过其他前端框架，但是，如果你的系统是基于jQuery的老系统，那么根本没法迁移，而使用这个插件，你就既能在原有系统基础上升级，同时又享受现代响应式编程的乐趣。相信我，如果你用过jQuery，你会在10秒内学会jQvm！
+JQvm是一个jQuery插件，同时也是一个MVVM响应式视图层框架。它帮助熟悉jQuery的开发者实现更便捷的开发。你可能用过其他前端框架，但是，如果你的系统是基于jQuery的老系统，那么根本没法迁移，而使用这个插件，你就既能在原有系统基础上升级，同时又享受现代响应式编程的乐趣。相信我，如果你用过jQuery，你会在10秒内学会jQvm！
 
 ## :rocket: 安装
 
@@ -57,7 +57,7 @@ const $ = useJQuery(jQuery)
 
 **第3步：实例化**
 
-接下来，你需要在脚本中实例化插件。
+接下来，你需要在脚本中实例化视图。
 
 ```html
 <script src="jquery.js"></script>
@@ -84,7 +84,7 @@ $('#app')
 
 **第3步：事件监听**
 
-你可以像使用jQuery的on一样，对实例化的界面内部的元素进行监听。
+你可以像使用jQuery的on一样，对视图内部的元素进行监听。
 
 ```html
 <script>
@@ -160,6 +160,8 @@ const {
 - filter(name:string, formatter:function): 注册全局过滤器
 - View: View构造器。基本上不会用到，只会用来作为一些判断依据。
 - useJQuery: 你可以使用另外一个版本的jQuery，一般只在模块系统中使用
+- createStore: 用于创建一个store的函数
+- createAsyncComponent: 用于创建一个异步组件的函数
 
 ### $.fn.vm
 
@@ -175,7 +177,7 @@ JQvm把`#app`内部的HTML字符串当作模板，用它们来构建界面。但
 
 - on(event, selector?, action): 绑定事件，但是需要注意，action函数和jQuery的事件绑定函数稍有区别，下文会讲
 - once(event, selector?, action): 对应jQuery的one绑定
-- off(event, selector?, action?): 解除通过`on`绑定的事件回调
+- off(event, selector?, action?): 解除通过`on`或`once`绑定的事件回调
 - mount(el?): 将view挂载到某个节点上，当不传el的时候，挂载到`<template>`后面
 - unmount(): 将view从DOM中卸载, 但是需要注意，卸载后view并没有被销毁，你可以再次执行mount来挂载
 - destroy(): 销毁，卸载并且释放内存，之后不能再调用mount或其他方法进行操作
@@ -184,7 +186,7 @@ JQvm把`#app`内部的HTML字符串当作模板，用它们来构建界面。但
 - component(name, compile, affect): 注册组件到当前vm
 - directive(name, compile, affect): 注册指令到当前vm
 - filter(name, formatter): 注册过滤器到当前vm
-- fn(name, action, patch?): 在当vm上定义一个名为name的函数，这个函数的形式和上面`on`的action一致。
+- fn(name, action): 在当vm上定义一个名为name的函数，这个函数的形式和上面`on`的action一致。
 
 接下来我们来看下mount接收参数的使用方法：
 
@@ -264,39 +266,26 @@ $(...)
 ```
 
 在上面的代码中，`my-component`是一个组件，它内部抛出来`change`事件。这段代码演示的就是怎么接住`my-component`抛出的change事件。
-我们通过组件模板元素上的`@change`属性规定接收change事件的方法，这个方法就是通过`fn`注册的`handleChange`函数。我们先不看后面的`var1, var2`。当`my-component`内部抛出change事件后，handleChange函数被执行，它执行完后又返回了一个函数，这个函数的参数...args就是my-component内部抛出的事件附带数据，即this.emit('change', ...args)中的...args。
+
+我们通过组件模板元素上的`@change`属性规定接收`change`事件的方法，这个方法就是通过`fn`注册的`handleChange`函数。我们先不看后面的`var1, var2`。当`my-component`内部抛出change事件后，handleChange函数被执行，它执行完后又返回了一个函数，这个函数的参数`...args`就是`my-component`内部抛出的事件附带数据，即`this.emit('change', ...args)`中的`...args`。
 
 接下来我们看下上面代码中@change内的`(var1,var2)`部分，这部分表示回调时，我们要绑定哪些当前vm中的state的属性。绑定的属性值，将会作为action函数的state之后的其他参数被使用。也就是说，state后面的其他参数，都是通过这种绑定的方式传入的，如果你没有在模板中传入()部分，那么就不会有其他参数。
-*这种绑定的方式不单单在组件的事件系统中有用，在前面的`on`事件绑定中也是生效的。*
 
-当我们使用`fn`在view上定义函数时，我们常常是为了在其他地方调用它。如果你仅仅在模板的`jq-on`中调用它，你可以不需要传`patch`，而如果你想在其他函数中调用定义好的函数，你需要传入`patch: true`，并且在调用时直接从view上读取，例如：
+*这种绑定的方式不单单在组件的事件系统中有用，在前面的`jq-on`事件绑定中也是生效的。*
+
+通过`fn`定义的函数，往往只会配合事件来使用，而不是真的定义了一个函数。如果你需要复用某个逻辑，应该考虑将函数在vm之外定义，然后在具体的某个action中调用该函数，例如：
 
 ```js
+function check(x, y) {
+  return x > y
+}
 $(...).vm(...)
-  // 传入第三个参数patch为true，该函数将被定义到view上，否则view上不存在该函数
-  .fn('check', (state) => (x) => {
-    ...
-  }, true)
-  .fn('submit', function(state){
-    return () => {
-      // 直接调用在view上定义好的check函数
-      if (this.check(100)) {
-        ...
-      }
+  .fn('submit', (state) => () => {
+    if (check(state.x, state.y)) {
+      ...
     }
   })
 ```
-
-不过这种调用有一个限制，即对于被定义的函数而言，不能存在给定的变量参数，例如：
-
-```js
-$(...).vm(...)
-  .fn('check', (state, var1, var2) => (x) => {
-    ...
-  }, true)
-```
-
-上面`check`函数在定义时存在`var1, var2`两个变量参数，这两个参数要求在生成函数时赋值，这就导致直接从view上读取的check函数不存在它们的值，因此，`patch`参数不能处理此类函数，此类函数仅适用于`jq-on`的回调。*当然，对于js编程来说，你可以把函数放在vm外面定义，在具体某个逻辑位置调用该函数，而不需要通过fn在view上强行定义某个函数。*
 
 除了组件的自定义的事件和DOM事件，jQvm的vm内也有一些事件，它们是：
 
@@ -325,7 +314,7 @@ $('#app')
 你需要调用`directive`来注册指令。指令是指特殊的一些元素属性。例如内置的指令`jq-on`，就是让你的某个元素拥有特定能力的指令。
 
 ```
-directive(name:string, compile:function, affect:function)
+directive(name:string, compile:function, affect?:function)
 ```
 
 - name: 指令名称
@@ -366,9 +355,9 @@ directive('jq-src', null, function($el, attrs) {
 - `jq-checked="!!exp"` 动态设定checked属性，仅限`input[type=checkbox]` `input[type=radio]`
 - `jq-selected="!!exp"` 动态设定selected属性，仅限`select > option`
 - `jq-bind="keyPath"` 双向数据绑定，仅限 `input` `select` `textarea`, 当用户在输入框输入时，state上的这个属性自动更新值，当state的这个属性值在另外一个地方被修改时，输入框的内容也跟随变化
-- `jq-src="{{exp}}"` 动态加载src，仅限`img`，而且你应该尽可能的使用`jq-src`替代原始的`src`属性
-- `jq-id="{{exp}}"` 动态设定id属性
-- `jq-repeat` 循环输出
+- `jq-src="exp"` 动态加载src，仅限`img`，而且你应该尽可能的使用`jq-src`替代原始的`src`属性，因为原始的`src`会立即加载图片，但很可能此时你的state上还没有给出正确的值
+- `jq-id="exp"` 动态设定id属性
+- `jq-repeat` 循环输出，下文详细讲
 - `jq-on="event:fn"` 绑定事件
 
 循环输出指令`jq-repeat`使用起来比较复杂:
@@ -401,8 +390,8 @@ component(name:string, compile:Function|view:View, affect?)
 
 - name: 新标签的名字
 - compile: 编译期处理函数
+  - view: 不传compile函数，而是传一个view实例，那么这个组件将在标签内完成view对应的vm规定的渲染逻辑
 - affect: 渲染结束后的处理函数
-- view: 不传compile函数，而是传一个view实例，那么这个组件将在标签内完成view对应的vm规定的渲染逻辑
 
 我们先来看下`my-icon`怎么实现吧：
 
@@ -435,7 +424,7 @@ const component = $(`
   })
 $('#component')
   .vm({ show: true, color: 'none' })
-  .component('my-dog', component)
+  .component('my-dog', component) // <-- 注册view为组件
   .fn('toggle', state => state.show = !state.show)
   .fn('change', (state) => (color) => {
     state.color = color
@@ -494,19 +483,21 @@ this.emit(event, ...args)
 
 具体用法在前面有关事件的地方讲过了。
 
-值得注意的是，`jq-on`和这里的组件事件完全不同，它们是两个体系。但是对于回调函数而言，它们却在用法上一致。
+值得注意的是，`jq-on`和这里的组件事件完全不同，它们是两个体系。但是对于回调函数而言，它们却在函数定义形式上一致。
 
 **hoist组件**
 
 前面的组件定义方法，会让最终的渲染结果被放置在组件标签内部。例如最终渲染为`<my-tag><div>...</div></my-tag>`，如果你想让渲染结果直接替换`<my-tag>`需要怎么办呢？你需要在template上添加一个`hoist`属性，例如下面这样做：
 
-```html
-<div>
-  ...
-</div>
+```js
+const component = $(`
+  <div>
+    ...
+  </div>
+`).vm({ ... })
 ```
 
-你只需要在模板中，直接使用非template作为标签，这样它就将替换组件标签`<my-tag>`完成渲染。
+你只需要在模板中，直接使用非template作为顶层标签，它就会在渲染时替换组件标签`<my-tag>`完成渲染。
 
 ## :bread: 过滤器
 
@@ -651,7 +642,7 @@ $('#app').vm({ loading: true })
 <my-article title="标题">内容：{{content}}</my-article>
 ```
 
-此时，`content`为外部vm中state的content属性值，而非组件内的state属性值。但是，在不同的组件中，这一效果会稍有不同，部分组件的编译逻辑不同，会同时使组件内和组件外的state对传递的内容生效，这根据组件的开发者自己决定。
+此时，`content`为外部vm中state的content属性值，而非组件内的state属性值。但是，因为开发者可以自己在定义组件时对组件进行编译，所以在不同的组件中，这一效果会稍有不同，部分组件的编译逻辑不同，会同时使组件内和组件外的state对传递的内容生效，这根据组件的开发者自己决定。
 
 ## jqvm-loader
 
@@ -676,7 +667,7 @@ $('#app').vm({ loading: true })
 </script>
 ```
 
-template上的`hoist`表示组件将作为hoist组件，最终渲染结果中，直接用模板内容替换组件标签。如果传入hoist，那么内部只允许一个顶层标签。
+template上的`hoist`表示组件将作为hoist组件，最终渲染结果中，直接用模板内容替换组件标签。如果传入hoist，那么内部只允许一个顶层标签。*注意，`template`上的`hoist`属性仅在loader编译系统中有用，在运行时定义组件时无效。*
 
 将这个htm/html文件放置在你的项目目录下，然后在webpack中如下使用：
 

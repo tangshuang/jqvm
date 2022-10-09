@@ -429,7 +429,7 @@ function affect($root, scope, view) {
             const event = camelCase(attr.substring(1))
             const [name, params] = parseKey(exp)
             const fn = view.fn(name)
-            outside[event] = (...args) => {
+            outside[event] = function(...args) {
               let res = null
               if (params) {
                 const args = params.map(arg => scope.parse(arg))
@@ -439,7 +439,7 @@ function affect($root, scope, view) {
                 res = fn.call(view, state)
               }
               if (isFunction(res)) {
-                res.apply(null, args)
+                return res.apply(this, args)
               }
             }
           }
@@ -905,18 +905,12 @@ function vm(initState = {}) {
   }
 
   const fns = {}
-  function fn(name, action, patch) {
+  function fn(name, action) {
     if (!action) {
       return fns[name]
     }
     else {
       fns[name] = action
-    }
-    if (patch) {
-      view[name] = function(...args) {
-        const f = action.call(view, state)
-        return f.call(this, ...args)
-      }
     }
     return view
   }
@@ -993,7 +987,7 @@ function vm(initState = {}) {
 directive('jq-repeat', function($el, attrs) {
   const attr = attrs['jq-repeat']
 
-  if (!/^[a-z][a-zA-Z0-9_$]*(,[a-z][a-zA-Z0-9_$]*){0,1} in [a-z][a-zA-Z0-9_$]+ traceby [a-z][a-zA-Z0-9_$.]*/.test(attr)) {
+  if (!/^[a-z][a-zA-Z0-9_$]*(,[a-z][a-zA-Z0-9_$]*){0,1} in [a-z][a-zA-Z0-9_$]+( traceby [a-z][a-zA-Z0-9_$.]*)?/.test(attr)) {
     throw new Error('jq-repeat should match formatter `value,key in data traceby id`!')
   }
 
@@ -1130,8 +1124,8 @@ directive('jq-on', null, function($el, attrs) {
 
   let f = fn
   if (params) {
-    const args = params.map(arg => scope.parse(arg))
     f = function(state) {
+      const args = params.map(arg => scope.parse(arg))
       return fn.call(this, state, ...args)
     }
   }
