@@ -480,6 +480,9 @@ function affect($root, scope, view) {
           el.__jQvmComponent = component
           component.mount($el)
         }
+        else if (!$el.attr('jqvm-name')) {
+          component.mount($el)
+        }
         else if (slotInner) {
           component.update(true)
         }
