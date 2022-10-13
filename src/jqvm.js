@@ -17,23 +17,28 @@ const globalComponents = []
 const globalDirectives = []
 const globalFilters = {}
 
-function _push(list, name, compile, affect) {
+// bigger priority come first
+function _push(list, name, compile, affect, priority = 10) {
   for (let i = 0, len = list.length; i < len; i ++) {
     const item = list[i]
     if (item[0] === name) {
-      list[i] = [name, compile, affect]
+      list[i] = [name, compile, affect, priority]
+      return
+    }
+    if (item[3] < priority) {
+      list.splice(i - 1, [name, compile, affect, priority])
       return
     }
   }
-  list.push([name, compile, affect])
+  list.push([name, compile, affect, priority])
 }
 
 export function component(name, compile, affect) {
   _push(globalComponents, name, compile, affect)
 }
 
-export function directive(name, compile, affect) {
-  _push(globalDirectives, name, compile, affect)
+export function directive(name, compile, affect, priority) {
+  _push(globalDirectives, name, compile, affect, priority)
 }
 
 export function filter(name, fn) {
@@ -62,7 +67,7 @@ function prepare($root) {
   records.length = 0
 }
 
-function compile($root, components, directives, state, view, [template, scope]) {
+function compile($root, components, directives, state, view, [template, scope, isolate]) {
   const root = $root[0]
   const records = root.__jQvmCompiledRecords = root.__jQvmCompiledRecords || []
 
@@ -179,6 +184,7 @@ function compile($root, components, directives, state, view, [template, scope]) 
     records.push(record)
     els.forEach(el => el.__jQvmCompiledRecord = record)
   }
+
   components.forEach(([name, compile, affect]) => {
     if (name === 'slot') {
       return
@@ -201,7 +207,7 @@ function compile($root, components, directives, state, view, [template, scope]) 
         const ctx = {
           scope,
           view,
-          compile: (temp, scp = scope) => boundCompile([temp, scp]),
+          compile: (temp, scp = scope, isl = isolate) => boundCompile([temp, scp, isl]),
           interpolate,
         }
         const output = onCompile.call(ctx, $el, attrs)
@@ -210,6 +216,12 @@ function compile($root, components, directives, state, view, [template, scope]) 
           $el.replaceWith($newEls)
           els = [...$newEls]
         }
+      }
+
+      if (isolate) {
+        const attr = $el.attr(name)
+        $el.removeAttr(name)
+        $el.attr(':' + name, attr)
       }
 
       const record = { affect: onAffect, attrs, els, scope }
@@ -273,7 +285,7 @@ function diffAndPatch($root, nodes) {
     const diffAttrNames = diffArray(currentAttrNames, nextAttrNames)
     diffAttrNames.forEach((name) => {
       // keep style and class attributes
-      if (name === 'style' || name === 'class' || name === 'jq-vm') {
+      if (name === 'style' || name === 'class' || name === 'jqvm-name') {
         return
       }
       $current.removeAttr(name)
@@ -285,7 +297,7 @@ function diffAndPatch($root, nodes) {
     if (current.__jQvmComponent) {
       if (
         current.nodeName === next.nodeName
-        && currentAttrs['jq-vm'] === nextAttrs['jq-vm']
+        && currentAttrs['jqvm-name'] === nextAttrs['jqvm-name']
       ) {
         return
       }
@@ -306,7 +318,7 @@ function diffAndPatch($root, nodes) {
         return
       }
 
-      const ignoreAttrs = ['style', 'class', 'jq-vm']
+      const ignoreAttrs = ['style', 'class', 'jqvm-name']
       if (
         current.nodeName === next.nodeName
         && $current.attr('data-hoist') === $current.attr('data-hoist')
@@ -501,8 +513,8 @@ function affect($root, scope, view) {
 
 function vm(initState = {}) {
   const $template = $(this)
-  const hash = $template.attr('id') || $template.attr('jq-vm-id') || (vmId ++, vmId)
-  const root = `[jq-vm=${hash}]`
+  const hash = $template.attr('id') || $template.attr('jqvm-id') || (vmId ++, vmId)
+  const root = `[jqvm-name=${hash}]`
 
   let state = null
   let scope = null
@@ -726,14 +738,14 @@ function vm(initState = {}) {
 
     if (el) {
       $root = $(el)
-      $root.attr('jq-vm', hash)
+      $root.attr('jqvm-name', hash)
     }
     // like $('<template>aaa</template>').vm(...)
     else if (!$(document).find($template).length) {
       throw new Error('el should must be passed by view.mount')
     }
     else {
-      $root = $('<div />', { 'jq-vm': hash, })
+      $root = $('<div />', { 'jqvm-name': hash, })
       $template.after($root)
     }
 
@@ -762,7 +774,7 @@ function vm(initState = {}) {
 
     if (mountTo) {
       $root.html('')
-      $root.removeAttr('jq-vm')
+      $root.removeAttr('jqvm-name')
     }
     else {
       $root.remove()
@@ -1018,8 +1030,9 @@ directive('jq-repeat', function($el, attrs) {
 
   // make it not be able to compile again
   $el.removeAttr('jq-repeat')
+  $el.attr(':jq-repeat', attr)
   if (traceBy) {
-    $el.attr('data-id', `{{${traceBy}}}`)
+    $el.attr('data-id', `{{${traceBy}}}`) // modify the template, this will be compiled
   }
 
   const $els = []
@@ -1034,7 +1047,7 @@ directive('jq-repeat', function($el, attrs) {
     }
     const scope = parentScope.$new(newScope)
 
-    const nodes = compile(temp, scope)
+    const nodes = compile(temp, scope, true)
     $els.push(...nodes)
   })
 

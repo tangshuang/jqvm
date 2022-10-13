@@ -466,5 +466,36 @@
         .mount()
     </script>
 
+    <div class="line"></div>
+
+    <h2>Debug</h2>
+    <template id="debug">
+      <div jq-repeat="item in items">
+        <div jq-if="!item.status">No</div>
+        <div jq-if="item.status">Yes</div>
+      </div>
+    </template>
+    <script>
+      $('#debug')
+        .vm({
+          items: [
+            {
+              status: 0,
+            },
+            {
+              status: 0,
+            },
+            {
+              status: 0,
+            },
+            {
+              id: 's:xxx',
+              status: 1,
+            },
+          ],
+        })
+        .mount()
+    </script>
+
   </body>
 </html>
