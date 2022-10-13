@@ -219,9 +219,7 @@ function compile($root, components, directives, state, view, [template, scope, i
       }
 
       if (isolate) {
-        const attr = $el.attr(name)
         $el.removeAttr(name)
-        $el.attr(':' + name, attr)
       }
 
       const record = { affect: onAffect, attrs, els, scope }
@@ -1033,7 +1031,6 @@ directive('jq-repeat', function($el, attrs) {
 
   // make it not be able to compile again
   $el.removeAttr('jq-repeat')
-  $el.attr(':jq-repeat', attr)
   if (traceBy) {
     $el.attr('data-id', `{{${traceBy}}}`) // modify the template, this will be compiled
   }

@@ -259,7 +259,6 @@ export function createRouter(options = {}) {
       }
 
       $el.removeAttr('jq-route')
-      $el.attr(':jq-route', attr)
 
       const { scope: parentScope, compile, interpolate } = this
       const $route = {
