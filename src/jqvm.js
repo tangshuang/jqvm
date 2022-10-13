@@ -376,7 +376,7 @@ function diffAndPatch($root, nodes) {
         move($prev)
       }
       else if (nextDataId) {
-        const $prev = $parent.find(`[data-id=${nextDataId}]`)
+        const $prev = $parent.find(`[data-id="${nextDataId}"]`)
         move($prev)
       }
       // insert coming child directly
