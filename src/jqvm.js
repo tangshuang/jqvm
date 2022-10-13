@@ -1160,6 +1160,10 @@ directive('jq-on', null, function($el, attrs) {
   }
 
   const path = getPath($el, $root)
+  if (!path) {
+    return
+  }
+
   view.on(event, path, f)
   return () => view.off(event, path, f)
 })

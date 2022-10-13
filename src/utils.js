@@ -51,7 +51,7 @@ export function getPath($element, $root, prefix = []) {
   let $parent = $element.parent()
 
   if (!$parent.length) {
-    return []
+    return null
   }
 
   const findIndex = ($parent, $child) => {
@@ -77,6 +77,10 @@ export function getPath($element, $root, prefix = []) {
   while ($parent[0] !== $root[0]) {
     const $element = $parent
     $parent = $parent.parent()
+
+    if (!$parent.length) {
+      return null
+    }
 
     const index = findIndex($parent, $element)
     const name = $element[0].nodeName.toLowerCase()

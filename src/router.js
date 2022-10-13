@@ -1,5 +1,5 @@
-import { directive } from './jqvm.js'
 import { getNodeName } from './utils.js'
+import { createProxy } from 'ts-fns'
 
 function rewriteHistory(type) {
   const origin = window.history[type]
@@ -166,40 +166,66 @@ class Router extends Base {
   }
 
   navigate(type, to) {
-    navigation[type](to)
+    const { mode } = this.options
+    if (mode === 'history') {
+      navigation[type](to)
+    }
+    else {
+      const { pathname, search = '' } = window.location
+      const url = pathname + search + '#' + to
+      navigation[type](url)
+    }
   }
 
   getUrl() {
     const { mode } = this.options
     const { hash, href, origin } = window.location
-    if (mode === 'hash') {
-      return hash.replace('#', '')
+    if (mode === 'history') {
+      return href.replace(origin, '')
     }
-    return href.replace(origin, '')
+    return hash.replace('#', '') || '/'
   }
 
   getLocation() {
     const url = this.getUrl()
-    const [path, hash = ''] = url.split('#')
-    const [pathname, search = ''] = path.split('?')
+    const [pathname, search = ''] = url.split('?')
+    const params = {}
+    search.split('&').filter(Boolean).forEach((item) => {
+      const [key, value] = item.split('=')
+      params[key] = value
+    })
     return {
-      path,
       pathname,
       search,
-      hash,
+      params,
     }
+  }
+
+  setParams(params) {
+    const { pathname, query } = this.getLocation()
+    const next = { ...query, ...params }
+    const search = Object.keys(next).reduce((str, key) => {
+      const value = next[key]
+      const pre = str ? str + '&' : ''
+      if (typeof value === 'undefined') {
+        return pre + key
+      }
+      return pre + key + '=' + value
+    }, '')
+    const url = pathname + (search ? '?' + search : '')
+    this.navigate('push', url)
   }
 
   isMatch(uri) {
-    const { pathname } = this.getLocation()
+    const url = this.getUrl()
     if (uri instanceof RegExp) {
-      return uri.test(pathname)
+      return uri.test(url)
     }
-    return pathname === uri
+    return url === uri
   }
 }
 
-export function createRouter(options) {
+export function createRouter(options = {}) {
   const { mode, baseUri } = options
   const router = new Router({
     mode,
@@ -207,6 +233,8 @@ export function createRouter(options) {
   })
 
   return function(view) {
+    view.router = router
+
     view.directive('jq-route', function($el, attrs) {
       const attr = attrs['jq-route']
       const hidden = `<!-- ${getNodeName($el[0])} jq-route="${attr}" (hidden) -->`
@@ -229,6 +257,29 @@ export function createRouter(options) {
       if (!router.isMatch(toMatch)) {
         return hidden
       }
+
+      $el.removeAttr('jq-route')
+      $el.attr(':jq-route', attr)
+
+      const { scope: parentScope, compile, interpolate } = this
+      const $route = {
+        params: createProxy({}, {
+          get: (keyPath) => {
+            const [key] = keyPath
+            const { params } = router.getLocation()
+            const value = params[key]
+            return value
+          },
+          writable: () => false,
+          enumerable: () => true,
+        }),
+      }
+      const scope = parentScope.$new({ $route })
+
+      interpolate($el, scope)
+
+      const nodes = compile($el[0].outerHTML, scope, true)
+      $el.replaceWith(nodes)
     })
 
     view.directive(

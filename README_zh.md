@@ -760,10 +760,28 @@ $(`
 
 注意点：
 
-- `createRouter({ mode: 'history' | 'hash', baseUri: '/xxx' })`
+- `createRouter({ mode: 'history' | 'hash', baseUri: '/xxx' })` mode 默认是 hash，可以都不传
 - `view.plugin(router)`
 - `jq-route="exp"` 用于匹配路由的指令，由于它是表达式，因此你可以传入正则表达式进行匹配
-- `jq-navigate` 用于规定路由跳转方法的指令，可选方法有：`push | replace | open | back | forward`
+- `jq-navigate` 用于规定跳转方法的指令，只能作用于a标签上，可选方法有：`push | replace | open | back | forward`
+
+其中，在`jq-route`指令内部，你可以使用 `$route.params` 读取当前路由下的参数。例如：
+
+```html
+<div jq-route="/\/some\?id=.*?/">
+  {{$route.params.id}}
+</div>
+```
+
+插件会使得view上多出一个router属性，你可以自己调用它的方法来进行某些处理。
+
+- getUrl(): string 获取当前路由指向的url
+- getLocation(): { pathname: string, search: string, params: object } 其中params是对search解析后得到的对象
+- setParams(params): void 调整当前search参数，没有涉及的不发生任何变化
+- isMatch(regexp): boolean 用于判断当前路由的url是否匹配某个路径
+- navigate(type: push | replace | open | back | forward, to: string): void 导航到一个新地址
+
+我们提供的是及其微小的路由导航系统，没有复杂的逻辑，也没有考虑复杂的url设计，只提供了通过search部分来传参，如果你想要传递某些对象的id，必须通过search部分传递。
 
 ## :see_no_evil: 开源协议
 

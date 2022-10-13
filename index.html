@@ -451,18 +451,34 @@
     <template id="router">
       <div jq-route="'/'">
         home
-        <a href="/admin/123" jq-navigate="push">admin</a>
+        <a href="/admin?id=a:1" jq-navigate="push">admin</a>
       </div>
-      <div jq-route="/^\/admin\/\d+/g">
+      <div jq-route="/^\/admin\?id=.*?/">
         admin
+        <button jq-on="click:showId">showId {{$route.params.id}}</button>
+        <button jq-on="click:changeId">changeId</button>
         <a jq-navigate="back">back</a>
       </div>
     </template>
     <script>
       const { createRouter } = window.jqvm
-      const router = createRouter({ mode: 'history' })
+      const router = createRouter()
       $('#router').vm({})
         .plugin(router)
+        .fn('showId', function() {
+          const { router } = this
+          return () => {
+            const { params } = router.getLocation()
+            const { id } = params
+            window.alert(id)
+          }
+        })
+        .fn('changeId', function () {
+          const { router } = this
+          return () => {
+            router.setParams({ id: Date.now() })
+          }
+        })
         .mount()
     </script>
 
