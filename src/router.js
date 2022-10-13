@@ -296,9 +296,16 @@ export function createRouter(options = {}) {
             $el.attr('target', '_blank')
           }
         }
+        else {
+          if (mode !== 'history') {
+            const href = $el.attr('href')
+            const url = href.replace(/^#+/, '')
+            $el.attr('href', '#' + url)
+          }
+        }
       },
       function($el, attrs) {
-        const type = attrs['jq-navigate']
+        const type = attrs['jq-navigate'] || 'push'
         const navigate = (e) => {
           if (['back', 'forward'].indexOf(type) > -1) {
             e.preventDefault()
@@ -307,7 +314,8 @@ export function createRouter(options = {}) {
           else if (['push', 'replace'].indexOf(type) > -1) {
             e.preventDefault()
             const href = $el.attr('href')
-            router.navigate(type, href)
+            const url = href.replace(/^#+/, '')
+            router.navigate(type, url)
           }
         }
         $el.on('click', navigate)
