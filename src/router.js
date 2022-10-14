@@ -334,6 +334,9 @@ export function createRouter(options = {}) {
         router.off('change', forceUpdate)
         router.destroy()
       },
+      $clone: () => (clonedView, view) => {
+        clonedView.router = view.router
+      },
     }
   }
 }

@@ -933,31 +933,40 @@ function vm(initState = {}) {
   }
 
   const clone = () => {
-    const view = vm.call(this, initState)
+    const newView = vm.call(this, initState)
     each(fns, (action, name) => {
-      view.fn(name, action)
+      newView.fn(name, action)
     })
     each(actions, (item) => {
       const { type, info, fn } = item
       const m = type === 'one' ? 'once' : 'on'
-      view[m](...info, fn)
+      newView[m](...info, fn)
     })
     each(components, (item) => {
       if (globalComponents.includes(item)) {
         return
       }
-      view.component(...item)
+      newView.component(...item)
     })
     each(directives, (item) => {
       if (globalDirectives.includes(item)) {
         return
       }
-      view.directive(...item)
+      newView.directive(...item)
     })
     each(filters, (fn, name) => {
-      view.filter(name, fn)
+      newView.filter(name, fn)
     })
-    return view
+    // clone action
+    const cloneActions = actions.filter(item => item.info[0] === '$clone')
+    cloneActions.forEach((item) => {
+      const { fn } = item
+      const handle = fn.call(view, state)
+      if (isFunction(handle)) {
+        handle(newView, view)
+      }
+    })
+    return newView
   }
 
   function plugin(fn) {
