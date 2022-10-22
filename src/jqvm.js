@@ -444,7 +444,7 @@ function affect($root, scope, view) {
             const event = camelCase(attr.substring(1))
             const [name, params] = parseKey(exp)
             const fn = view.fn(name)
-            outside[event] = function(...args) {
+            outside['@' + event] = function(...args) {
               let res = null
               if (params) {
                 const args = params.map(arg => finalScope.parse(arg))
@@ -488,7 +488,7 @@ function affect($root, scope, view) {
         }
 
         // let attrs has the result so that we can use them in effects
-        attrs._attrs = outside
+        // attrs._attrs = outside
       })
 
       // remove no use info
@@ -515,7 +515,8 @@ function affect($root, scope, view) {
 // ---------------- main ---------------
 
 function vm(initState = {}) {
-  const $template = $(this)
+  const template = this
+  const $template = $(template)
   const hash = $template.attr('id') || $template.attr('jqvm-id') || (vmId ++, vmId)
   const root = `[jqvm-name=${hash}]`
 
@@ -526,6 +527,7 @@ function vm(initState = {}) {
   let mountTo = null
   let isMounted = false
   let isUnmounted = false
+
   const getMountNode = () => {
     return mountTo ? $(mountTo) : $template.next(root)
   }
@@ -538,6 +540,7 @@ function vm(initState = {}) {
   const components = [...globalComponents]
   const directives = [...globalDirectives]
   const filters = { ...globalFilters }
+  const fns = {}
 
   function component(name, compile, affect) {
     _push(components, name, compile, affect)
@@ -617,34 +620,10 @@ function vm(initState = {}) {
     scope = new ScopeX(state, { filters })
     currTick()
 
-    $template.trigger('$init')
-  }
-
-  function listen() {
-    $template.on('$mount', function() {
-      const $root = getMountNode()
-      actions.forEach((item) => {
-        const { type, info, action } = item
-        $root[type](...info, action)
-      })
-    })
-
-    $template.on('$unmount', () => {
-      const $root = getMountNode()
-      actions.forEach((item) => {
-        const { info, action } = item
-        $root.off(...info, action)
-      })
-    })
-
-    $template.one('$init', (e) => {
-      actions.forEach((item) => {
-        const { info, action } = item
-        if (info[0] === '$init') {
-          action.call(null, e)
-        }
-      })
-    })
+    // setupSpecialEvents should be invoked here
+    // because these events should be registered before $init triggered
+    setupSpecialEvents()
+    view.emit('$init')
   }
 
   function render(isUpdating) {
@@ -696,22 +675,20 @@ function vm(initState = {}) {
       })
     }
 
-    $root.trigger('$render')
+    $template.trigger('$render')
   }
 
   function change(e) {
-    const $root = getMountNode()
     let flag = true
     const prevent = () => flag = false
-    $root.trigger('$change', [e, prevent])
+    $template.trigger('$change', [e, prevent])
     return flag
   }
 
   function shouldUpdate() {
-    const $root = getMountNode()
     let flag = true
     const prevent = () => flag = false
-    $root.trigger('$update', [state, prevent])
+    $template.trigger('$update', [state, prevent])
     return flag
   }
 
@@ -757,7 +734,6 @@ function vm(initState = {}) {
 
     render()
     $template.trigger('$mount')
-    $root.trigger('$mount')
 
     isMounted = true
     isUnmounted = false
@@ -776,7 +752,7 @@ function vm(initState = {}) {
       return
     }
 
-    $root.trigger('$unmount')
+    $template.trigger('$unmount')
 
     if (mountTo) {
       $root.html('')
@@ -794,7 +770,7 @@ function vm(initState = {}) {
   }
 
   function destroy() {
-    $root.trigger('$beforeDestroy')
+    $template.trigger('$beforeDestroy')
 
     const $root = getMountNode()
 
@@ -808,7 +784,7 @@ function vm(initState = {}) {
     delete root.__jQvmComponentInstances
     delete root.__jQvmCompiledRecords
 
-    $root.trigger('$destroy')
+    $template.trigger('$destroy')
   }
 
   function update(nextState, type) {
@@ -857,58 +833,133 @@ function vm(initState = {}) {
   function bind(args, once) {
     const info = [...args]
     const fn = info.pop()
+    const [event, selector] = info;
 
-    const action = function(e, ...params) {
+    const handle = function(e, ...eventArgs) {
+      const event = e.handleObj.origType
       // stop broadcast the event
-      if (e.handleObj.origType.indexOf('$') === 0) {
+      if (event[0] === '$') {
         e.stopPropagation()
         if (e.target !== e.currentTarget) {
           return
         }
       }
 
-      const handle = fn.call(view, state, ...params)
-      const res = isFunction(handle) ? handle.call(this, e) : null
+      let res = null
+      if (event[0] === '$') {
+        fn.call(view, state, ...eventArgs)
+      }
+      else {
+        const callback = fn.call(view, state)
+        if (isFunction(callback)) {
+          res = callback.call(this, e, ...eventArgs)
+        }
+      }
+
+      if (once) {
+        unbind(args)
+      }
+
       return res
     }
 
-    const type = once ? 'one' : 'on'
+    const item = { once, event, selector, fn, handle }
+    actions.push(item)
 
-    actions.push({ type, info, fn, action })
-
+    // events will be bound when $mount by `setup`
+    // developers may invoke this.on(...) after view mounted, at this time, the event callback should be bound immediately
     if (isMounted) {
       const $root = getMountNode()
-      $root[type](...info, action)
+      const type = once ? 'one' : 'on'
+      if (event[0] === '$') {
+        $template[type](event, handle)
+      }
+      else {
+        const info = [event, selector].filter(Boolean)
+        $root[type](...info, handle)
+      }
     }
   }
 
   function unbind(args) {
-    if (args.length < 3) {
-      const $root = getMountNode()
-      actions.forEach((item, i) => {
-        const { info, action } = item
-        if (args.length === 2 && isEqual(info, args)) {
-          $root.off(...info, action)
-          actions.splice(i, 1)
-        }
-        else if (args.length === 1 && info[0] === args[0]) {
-          $root.off(...info, action)
-          actions.splice(i, 1)
-        }
-      })
-      return
-    }
-
     const info = [...args]
     const fn = info.pop()
-    const $root = getMountNode()
+    const [event, selector] = info;
 
+    const $root = getMountNode()
     actions.forEach((item, i) => {
-      const { info, action } = item
-      if (fn === item.fn) {
-        $root.off(...info, action)
+      if (event === item.event && selector === item.selector && fn === item.fn) {
+        const { event, selector, handle } = item
+        const args = [event, selector, handle].filter(Boolean)
+        if (event[0] === '$') {
+          $template.off(...args)
+        }
+        else {
+          $root.off(...args)
+        }
         actions.splice(i, 1)
       }
+    })
+  }
+
+  function emit(event, ...args) {
+    // trigger those passed to components, only works for components
+    if (outside && isFunction(outside['@' + event])) {
+      const fn = outside['@' + event]
+      fn(...args)
+    }
+
+    // only works for events begin with $
+    if (event[0] !== '$') {
+      return
+    }
+    // trigger those bind to view root
+    actions.forEach((item) => {
+      if (item.event === event) {
+        $template.trigger(event, ...args)
+      }
+    })
+  }
+
+  function setupSpecialEvents() {
+    actions.forEach((item) => {
+      const { event, handle } = item
+      if (['$init', '$destroy', '$beforeDestroy', '$mount'].indexOf(event) === -1) {
+        return
+      }
+      $template.one(event, handle)
+    })
+  }
+
+  function setup() {
+    $template.on('$mount', function() {
+      const $root = getMountNode()
+      actions.forEach((item) => {
+        const { once, event, selector, handle } = item
+        if (['$init', '$destroy', '$beforeDestroy', '$mount', '$clone'].indexOf(event) > -1) {
+          return
+        }
+        const type = once ? 'one' : 'on'
+        if (event[0] === '$') {
+          $template[type](event, handle)
+        }
+        else {
+          const info = [event, selector].filter(Boolean)
+          $root[type](...info, handle)
+        }
+      })
+    })
+
+    $template.on('$unmount', () => {
+      const $root = getMountNode()
+      actions.forEach((item) => {
+        const { event, selector, action } = item
+        if (event[0] === '$') {
+          return
+        }
+        const info = [event, selector].filter(Boolean)
+        $root.off(...info, action)
+      })
     })
   }
 
@@ -917,26 +968,7 @@ function vm(initState = {}) {
     return $root.find(selector)
   }
 
-  function emit(event, ...args) {
-    // trigger those passed to components, only works for components
-    if (outside && isFunction(outside[event])) {
-      const fn = outside[event]
-      fn(...args)
-    }
 
-    // trigger those bind to view root
-    const index = actions.findIndex(item => item.info.length === 1 && item.info[0] === event)
-    if (index > -1) {
-      const { type } = actions[index]
-      const $root = getMountNode()
-      $root.trigger(event, ...args)
-      if (type === 'one') {
-        actions.splice(index, 1)
-      }
-    }
-  }
-
-  const fns = {}
   function fn(name, action) {
     if (!action) {
       return fns[name]
@@ -947,13 +979,14 @@ function vm(initState = {}) {
     return view
   }
 
-  const clone = () => {
-    const newView = vm.call(this, initState)
+  function clone() {
+    const newView = vm.call(template, initState)
     each(fns, (action, name) => {
       newView.fn(name, action)
     })
     each(actions, (item) => {
-      const { type, info, fn } = item
+      const { type, event, selector, fn } = item
+      const info = [event, selector].filter(Boolean)
       const m = type === 'one' ? 'once' : 'on'
       newView[m](...info, fn)
     })
@@ -972,27 +1005,23 @@ function vm(initState = {}) {
     each(filters, (fn, name) => {
       newView.filter(name, fn)
     })
+
     // clone action
-    const cloneActions = actions.filter(item => item.info[0] === '$clone')
-    cloneActions.forEach((item) => {
-      const { fn } = item
-      const handle = fn.call(view, state)
-      if (isFunction(handle)) {
-        handle(newView, view)
+    actions.forEach((item) => {
+      const { event, fn } = item
+      if (event !== '$clone') {
+        return
       }
+      fn.call(view, state, newView)
     })
+
     return newView
   }
 
   function plugin(fn) {
     const lifecycle = fn.call({
       view,
-      get scope() {
-        return scope
-      },
-      get state() {
-        return state
-      },
+      scope,
     })
     if (lifecycle) {
       const events = Object.keys(lifecycle)
@@ -1038,7 +1067,7 @@ function vm(initState = {}) {
     attributes: { value: attributes },
   })
 
-  listen()
+  setup()
 
   return view
 }

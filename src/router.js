@@ -234,7 +234,6 @@ export function createRouter(options = {}) {
 
   return function() {
     const { view } = this
-    const ctx = this
 
     const $route = {
       params: createProxy({}, {
@@ -320,17 +319,17 @@ export function createRouter(options = {}) {
     }
 
     return {
-      $init: () => {
+      $init: (state) => {
         view.$router = router
-        ctx.state.$route = $route
+        state.$route = $route
         router.on('change', routerChange)
       },
       $destroy: () => {
         router.off('change', routerChange)
         router.destroy()
       },
-      $clone: () => (clonedView, view) => {
-        clonedView.router = view.router
+      $clone: (state, clonedView) => {
+        clonedView.$router = router
       },
     }
   }
