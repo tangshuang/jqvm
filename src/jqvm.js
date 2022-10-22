@@ -1,7 +1,7 @@
-import ScopeX from 'scopex'
+import { ScopeX } from 'scopex'
 import {
   isNone, each, isObject, isFunction, isString,
-  diffArray, uniqueArray, getObjectHash, createReactive,
+  diffArray, uniqueArray, getObjectHash, createProxy,
   isEqual, throttle, filter as filterProps, isShallowEqual,
 } from 'ts-fns'
 import { getPath, camelCase, parseKey, getNodeName, getNodeAttrs, createAttrsText } from './utils.js'
@@ -614,8 +614,9 @@ function vm(initState = {}) {
       assignOutsideState(next, outside, true)
     }
 
-    state = createReactive(next, {
+    state = createProxy(next, {
       dispatch: nextTick,
+      enumerable: () => true,
     })
     scope = new ScopeX(state, { filters })
     currTick()

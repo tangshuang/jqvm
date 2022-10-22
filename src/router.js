@@ -1,5 +1,4 @@
 import { getNodeName } from './utils.js'
-import { createProxy } from 'ts-fns'
 
 function rewriteHistory(type) {
   const origin = window.history[type]
@@ -235,18 +234,14 @@ export function createRouter(options = {}) {
   return function() {
     const { view } = this
 
-    const $route = {
-      params: createProxy({}, {
-        get: (keyPath) => {
-          const [key] = keyPath
-          const { params } = router.getLocation()
-          const value = params[key]
-          return value
-        },
-        writable: () => false,
-        enumerable: () => true,
-      }),
-    }
+    const $route = {}
+    Object.defineProperty($route, 'params', {
+      get: () => {
+        const { params } = router.getLocation()
+        return params
+      },
+      enumerable: true,
+    })
 
     view.directive('jq-route', function($el, attrs) {
       const attr = attrs['jq-route']

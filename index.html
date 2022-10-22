@@ -340,8 +340,11 @@
     <template id="store1">
       <span>{{name}}</span>
       <span>{{age}}</span>
+      <span>{{body.count}}</span>
       <button class="grow">grow</button>
       <button class="reset">reset</button>
+      <button class="plus">plus</button>
+      <span jq-if="body.count > 10">gt 10</span>
     </template>
     <template id="store2">
       <span>{{name}}</span>
@@ -356,6 +359,7 @@
       const store = createStore({
         name: 'tomy',
         age: 10,
+        body: {},
       })
       const inner = $(`<span>{{age}}</span>`)
         .vm(store)
@@ -363,6 +367,14 @@
         .vm(store)
         .on('click', 'button.grow', state => state.age ++)
         .on('click', 'button.reset', state => state.age = 9)
+        .on('click', 'button.plus', state => {
+          if (!state.body.count) {
+            state.body.count = 1
+          }
+          else {
+            state.body.count ++
+          }
+        })
         .mount()
       $('#store2')
         .vm(store)
@@ -456,7 +468,7 @@
       </div>
       <div jq-route="/^\/admin\?id=.*?/">
         admin
-        <button jq-on="click:showId">showId {{$route.params.id}}</button>
+        <button jq-on="click:showId" data-id="{{$route.params.id}}">showId {{$route.params.id}}</button>
         <button jq-on="click:changeId">changeId</button>
         <a jq-navigate="back">back</a>
       </div>
