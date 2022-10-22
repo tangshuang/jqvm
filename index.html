@@ -181,6 +181,7 @@
       $('#async')
         .vm({ content: 'init' })
         .fn('refresh', (state, delay) => {
+          console.log('delay:', delay)
           setTimeout(() => state.content = Date.now(), 1000 * +delay)
         })
         .mount()
@@ -465,18 +466,21 @@
       const router = createRouter()
       $('#router').vm({})
         .plugin(router)
+        .on('$route', (state, url) => {
+          console.log('route to ', url)
+        })
         .fn('showId', function() {
-          const { router } = this
+          const { $router } = this
           return () => {
-            const { params } = router.getLocation()
+            const { params } = $router.getLocation()
             const { id } = params
             window.alert(id)
           }
         })
         .fn('changeId', function () {
-          const { router } = this
+          const { $router } = this
           return () => {
-            router.setParams({ id: Date.now() })
+            $router.setParams({ id: Date.now() })
           }
         })
         .mount()

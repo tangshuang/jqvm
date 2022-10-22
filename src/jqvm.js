@@ -541,6 +541,9 @@ function vm(initState = {}) {
 
   function component(name, compile, affect) {
     _push(components, name, compile, affect)
+    if (compile && compile instanceof View) {
+      view.on('$beforeDestroy', () => compile.destroy())
+    }
     return view
   }
 
@@ -791,6 +794,8 @@ function vm(initState = {}) {
   }
 
   function destroy() {
+    $root.trigger('$beforeDestroy')
+
     const $root = getMountNode()
 
     unmount()
@@ -799,11 +804,11 @@ function vm(initState = {}) {
     scope = null
     actions.length = 0
 
-    $root.trigger('$destroy')
-
     const root = $root[0]
     delete root.__jQvmComponentInstances
     delete root.__jQvmCompiledRecords
+
+    $root.trigger('$destroy')
   }
 
   function update(nextState, type) {
@@ -862,8 +867,8 @@ function vm(initState = {}) {
         }
       }
 
-      const handle = fn.call(view, state)
-      const res = isFunction(handle) ? handle.call(this, e, ...params) : null
+      const handle = fn.call(view, state, ...params)
+      const res = isFunction(handle) ? handle.call(this, e) : null
       return res
     }
 
@@ -913,14 +918,22 @@ function vm(initState = {}) {
   }
 
   function emit(event, ...args) {
-    if (!outside) {
-      return
+    // trigger those passed to components, only works for components
+    if (outside && isFunction(outside[event])) {
+      const fn = outside[event]
+      fn(...args)
     }
-    const fn = outside[event]
-    if (!isFunction(fn)) {
-      return
+
+    // trigger those bind to view root
+    const index = actions.findIndex(item => item.info.length === 1 && item.info[0] === event)
+    if (index > -1) {
+      const { type } = actions[index]
+      const $root = getMountNode()
+      $root.trigger(event, ...args)
+      if (type === 'one') {
+        actions.splice(index, 1)
+      }
     }
-    fn(...args)
   }
 
   const fns = {}
@@ -972,7 +985,15 @@ function vm(initState = {}) {
   }
 
   function plugin(fn) {
-    const lifecycle = fn.call({ view, scope }, view)
+    const lifecycle = fn.call({
+      view,
+      get scope() {
+        return scope
+      },
+      get state() {
+        return state
+      },
+    })
     if (lifecycle) {
       const events = Object.keys(lifecycle)
       events.forEach((event) => {

@@ -232,8 +232,22 @@ export function createRouter(options = {}) {
     baseUri,
   })
 
-  return function(view) {
-    view.router = router
+  return function() {
+    const { view } = this
+    const ctx = this
+
+    const $route = {
+      params: createProxy({}, {
+        get: (keyPath) => {
+          const [key] = keyPath
+          const { params } = router.getLocation()
+          const value = params[key]
+          return value
+        },
+        writable: () => false,
+        enumerable: () => true,
+      }),
+    }
 
     view.directive('jq-route', function($el, attrs) {
       const attr = attrs['jq-route']
@@ -257,28 +271,6 @@ export function createRouter(options = {}) {
       if (!router.isMatch(toMatch)) {
         return hidden
       }
-
-      $el.removeAttr('jq-route')
-
-      const { scope: parentScope, compile, interpolate } = this
-      const $route = {
-        params: createProxy({}, {
-          get: (keyPath) => {
-            const [key] = keyPath
-            const { params } = router.getLocation()
-            const value = params[key]
-            return value
-          },
-          writable: () => false,
-          enumerable: () => true,
-        }),
-      }
-      const scope = parentScope.$new({ $route })
-
-      interpolate($el, scope)
-
-      const nodes = compile($el[0].outerHTML, scope, true)
-      $el.replaceWith(nodes)
     })
 
     view.directive(
@@ -322,16 +314,19 @@ export function createRouter(options = {}) {
       },
     )
 
-    const forceUpdate = () => {
+    const routerChange = () => {
+      view.emit('$route', router.getUrl())
       view.update(true)
     }
 
     return {
       $init: () => {
-        router.on('change', forceUpdate)
+        view.$router = router
+        ctx.state.$route = $route
+        router.on('change', routerChange)
       },
       $destroy: () => {
-        router.off('change', forceUpdate)
+        router.off('change', routerChange)
         router.destroy()
       },
       $clone: () => (clonedView, view) => {

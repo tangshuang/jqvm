@@ -17,7 +17,7 @@
 
 ## :hear_no_evil:  什么是jQvm?
 
-JQvm是一个jQuery插件，同时也是一个MVVM响应式视图层框架。它帮助熟悉jQuery的开发者实现更便捷的开发。你可能用过其他前端框架，但是，如果你的系统是基于jQuery的老系统，那么根本没法迁移，而使用这个插件，你就既能在原有系统基础上升级，同时又享受现代响应式编程的乐趣。相信我，如果你用过jQuery，你会在10秒内学会jQvm！
+jQvm是一个jQuery插件，同时也是一个MVVM响应式视图层框架。它帮助熟悉jQuery的开发者实现更便捷的开发。你可能用过其他前端框架，但是，如果你的系统是基于jQuery的老系统，那么根本没法迁移，而使用这个插件，你就既能在原有系统基础上升级，同时又享受现代响应式编程的乐趣。相信我，如果你用过jQuery，你会在10秒内学会jQvm！
 
 ## :rocket: 安装
 
@@ -121,7 +121,7 @@ $('#app')
 
 ## :tada: API
 
-> jQvm里面有两个概念：View和VM。我们调用`$('#app').vm({ a: 1 })`时会在上下文中建立一个VM，返回的是一个View的实例。VM对开发者不可见，它有一个state作为渲染界面的数据，这个state可在事件监听或方法调用时作为函数的参数被拿到。View实例是开发者使用的主要的对象，这个view提供了一堆方法，具体看下文。
+> jQvm里面有两个概念：View和VM。我们调用`$('#app').vm({ a: 1 })`时会在上下文中建立一个VM，返回的是一个View的实例。VM对开发者不可见，它有一个state作为渲染界面的数据，这个state可在事件监听或方法调用时作为函数的参数被拿到。View实例是开发者使用的主要的对象，这个view提供了一堆方法，在大部分情况下都可以被获取，具体看下文。
 
 ### 导出接口
 
@@ -165,17 +165,17 @@ const {
 
 ### $.fn.vm
 
-JQvm是一个jQuery插件，所以使用的时候，像其他插件一样，你可以这么用：
+jQvm是一个jQuery插件，所以使用的时候，像其他插件一样，你可以这么用：
 
 ```js
 const view = $('#app').vm(initState)
 ```
 
-JQvm把`#app`内部的HTML字符串当作模板，用它们来构建界面。但是，如果你直接在HMTL中写标签，会被渲染到界面上，所以，jQvm强制你用`<template>`来写模板，这样就不会在html文件加载好时渲染模板元素。
+jQvm把`#app`内部的HTML字符串当作模板，用它们来构建界面。但是，如果你直接在HMTL中写标签，会被渲染到界面上，所以，jQvm强制你用`<template>`来写模板，这样就不会在html文件加载好时渲染模板元素。
 
 `.vm`方法返回一个`view`，这个view包含来如下方法：
 
-- on(event, selector?, action): 绑定事件，但是需要注意，action函数和jQuery的事件绑定函数稍有区别，下文会讲
+- on(event, selector?, action): 绑定事件，传入对应的行为函数
 - once(event, selector?, action): 对应jQuery的one绑定
 - off(event, selector?, action?): 解除通过`on`或`once`绑定的事件回调
 - mount(el?): 将view挂载到某个节点上，当不传el的时候，挂载到`<template>`后面
@@ -186,7 +186,7 @@ JQvm把`#app`内部的HTML字符串当作模板，用它们来构建界面。但
 - component(name, compile, affect): 注册组件到当前vm
 - directive(name, compile, affect): 注册指令到当前vm
 - filter(name, formatter): 注册过滤器到当前vm
-- fn(name, action): 在当vm上定义一个名为name的函数，这个函数的形式和上面`on`的action一致。
+- fn(name, action): 在当vm上定义一个名为name的行为函数
 
 接下来我们来看下mount接收参数的使用方法：
 
@@ -204,74 +204,16 @@ $(template)
 
 如果你采用了这种字符串模板的形式，那么mount的时候必须挂载到一个具体的节点。但是，如果你是基于HTML中的`<template>`标签创建模板，那么可以不用传，mount会把渲染结果挂载在对应的那个`<template>`标签后面，这样可以根据你页面中template的位置来决定布局。
 
-接下来，我们来看一下比较复杂的`action`具体怎么定义：
+jQvm试图保留jQuery的编程风格，并在其基础上增加一些灵活性，因此，对于事件绑定的函数会和jQuery中的函数稍有不同。在jQvm中，我们多了vm这个部分，因此，我们进行事件处理时，常常是为了修改state，通过state的变化来触发界面的更新。因此，在jQvm的事件绑定函数中，我们首先暴露出state，在函数中任何对state的变更都会引起重新渲染。我们把这个函数称为“行为函数”。*行为函数将在下文“事件系统”中详细讲解。*
 
 ```js
-// state: 当前vm中对应的state
-// ...args: 在模板中绑定的参数列表，下面会有例子
-function action(state, ...args) {
-  const view = this // 你可以在这里执行类似`view.unmount()`这样的操作
-
-  state.some = 'next' // `some`必须在initState中定义好，否则不会有响应式更新界面效果
-  // 当然，jQvm提供了解决办法，你可以通过调用`state.$set('some', 'next')`来添加那些没有在initState中定义的属性
-  // 修改state触发更新支持异步，例如setTimeout(() => state.some = 'next', 1000)也是正常工作的
-  // 如果你自己写了一个类，并且把它的实例作为state上的属性，那么修改这个实例是没有办法触发更新的，你需要手动调用`view.update()`来触发更新，
-  // 例如`state.myIns.name = 'new name'; view.update()`
-
-  // 如果是用于事件绑定，action的返回值也必须是一个函数，这个函数将被作为事件的回调函数，你可以在它里面接收event对象作为参数
-  // 不过，handle函数是可选的，不返回任何内容也是可以的，只是这样你就无法拿到event对象。
-  return function handle(e) {
-    const el = e.target
-    const $el = $(this) // el === this
-  }
-}
-
-view.on('click', '.some', action)
-```
-
-另一种绑定事件的方法是使用`jq-on`指令，这种方式虽然和jQuery中的传统做法不同，你需要通过`fn`方法提前定义好函数，但是action的定义是一模一样的。
-
-```html
-<template>
-  <div>{{title}}</div>
-  <button jq-on="click:change"></button>
-</template>
-
-<script>
-  $('#app')
-    .vm({ title: 'Title' })
-    // fn的第二个参数就是action函数
-    .fn('change', state => e => {
-      const el = e.target
-      state.title = 'New Title'
-    })
-    .mount()
-</script>
-```
-
-另外，还有一种场景是下文会提到的组件的事件系统。组件的事件系统和DOM事件系统是两回事，但是它们的用法也差不多。在组件内部开发者通过`this.emit(event, ...args)`抛出一个事件，外部通过在组件节点上传入对应的方法，来接收这个事件，并执行回调。
-
-
-```html
-<my-component @change="handleChange(var1,var2)"></my-component>
-
-<script>
-$(...)
-  .vm({ var1: 1, var2: 2 })
-  .fn('handleChange', (state, var1, var2) => (...args) => {
-    // var1, var2 is from template
-    // ...args is from inside component `this.emit`
+$().vm({ time: Date.now() })
+  .on('click', '.button', (state) => {
+    state.time = Date.now()
   })
-</script>
 ```
 
-在上面的代码中，`my-component`是一个组件，它内部抛出来`change`事件。这段代码演示的就是怎么接住`my-component`抛出的change事件。
-
-我们通过组件模板元素上的`@change`属性规定接收`change`事件的方法，这个方法就是通过`fn`注册的`handleChange`函数。我们先不看后面的`var1, var2`。当`my-component`内部抛出change事件后，handleChange函数被执行，它执行完后又返回了一个函数，这个函数的参数`...args`就是`my-component`内部抛出的事件附带数据，即`this.emit('change', ...args)`中的`...args`。
-
-接下来我们看下上面代码中@change内的`(var1,var2)`部分，这部分表示回调时，我们要绑定哪些当前vm中的state的属性。绑定的属性值，将会作为action函数的state之后的其他参数被使用。也就是说，state后面的其他参数，都是通过这种绑定的方式传入的，如果你没有在模板中传入()部分，那么就不会有其他参数。
-
-*这种绑定的方式不单单在组件的事件系统中有用，在前面的`jq-on`事件绑定中也是生效的。*
+> 你应该通过修改state来达到界面更新的效果，而非通过直接在方法内操作DOM的方式来更新界面。
 
 通过`fn`定义的函数，往往只会配合事件来使用，而不是真的定义了一个函数。如果你需要复用某个逻辑，应该考虑将函数在vm之外定义，然后在具体的某个action中调用该函数，例如：
 
@@ -286,28 +228,6 @@ $(...).vm(...)
     }
   })
 ```
-
-除了组件的自定义的事件和DOM事件，jQvm的vm内也有一些事件，它们是：
-
-- $mount: 调用`view.mount()`时触发
-- $unmount: 调用`view.unmount()`时触发
-- $render: view的内容被完全渲染后触发
-- $change: state变化后触发
-- $init: 实例化view时被触发
-- $destroy: view被销毁时触发（仅支持手动调用view.destroy来销毁view）
-
-这些内置事件需要使用`on`来监听：
-
-```js
-$('#app')
-  .vm({ name: 'some' })
-  .on('$mount', state => {
-    state.name = 'new name'
-  })
-  .mount()
-```
-
-> 你应该通过修改state来达到界面更新的效果，而非通过直接在方法内操作DOM的方式来更新界面。
 
 ## :dizzy: 指令
 
@@ -457,34 +377,6 @@ const view = $(`
 
 *需要注意，`:`开头的属性，仅限于自定义组件，普通HTML元素不支持。`type="{{type}}"`这种形式也可以基于状态动态设定值，但是它和`:type="type"`不同的是，前者传递给组件内部的是纯字符串，而后者传递进去的是表达式的结果，也就可能是数字或对象。*
 
-**组件事件系统**
-
-在一个组件内部，你可以调用`view.emit()`来向组件外抛出事件。举个例子：
-
-```js
-$(...).vm(() => ({ ... }))
-  .fn('change', function(state) {
-    return (e) => this.emit('change', e) // 这里的this指向对应的view
-  })
-```
-
-上面的代码中，组件内部通过`this.emit('change', e)`向外部抛出了change事件，同时附带了e这个数据。
-
-```js
-this.emit(event, ...args)
-```
-
-那么在外部，就可以如下接住这个事件。
-
-
-```html
-<my-component @change="fn_change">
-```
-
-具体用法在前面有关事件的地方讲过了。
-
-值得注意的是，`jq-on`和这里的组件事件完全不同，它们是两个体系。但是对于回调函数而言，它们却在函数定义形式上一致。
-
 **hoist组件**
 
 前面的组件定义方法，会让最终的渲染结果被放置在组件标签内部。例如最终渲染为`<my-tag><div>...</div></my-tag>`，如果你想让渲染结果直接替换`<my-tag>`需要怎么办呢？你需要在template上添加一个`hoist`属性，例如下面这样做：
@@ -498,6 +390,171 @@ const component = $(`
 ```
 
 你只需要在模板中，直接使用非template作为顶层标签，它就会在渲染时替换组件标签`<my-tag>`完成渲染。
+
+## 事件系统
+
+jQvm内部存在两套事件系统，不过在用法上它们是一致的，在使用时不用担心写错，但是你必须理解这两套事件系统之后，才能避免在使用过程中出现不可预期的结果。
+
+### 使用方法
+
+```js
+// 第一种：通过view.on()绑定
+$().vm()
+  // 回调函数是可选的
+  .on('事件名', '子元素选择器', 行为函数(state, 参数列表) => 回调函数?(e))
+
+// 第二种：通过jq-on绑定
+// 先在模板中调用
+<button jq-on="事件名:行为函数(参数列表)"></button>
+// 然后使用view.fn对行为函数进行定义
+$().vm()
+  // 回调函数是可选的
+  .fn('行为函数', (state, 参数列表) => 回调函数?(e))
+
+// 第三种：通过@对组建进行事件绑定
+// 在调用组件时绑定事件
+// 这里的行为函数，在当前调用该组件的视图里面定义
+<my-component @事件名="行为函数(参数列表)"></my-component>
+// 然后在组件内部（注意是组件内部）进行事件抛出
+$().vm()
+  // 在组件内部可能会使用jq-on来使用下面这个定义的行为函数
+  // 注意，此处的函数必须是function函数，而不能是箭头函数，因为内部要使用this
+  .fn('某个内部行为函数', function() {
+    // 要抛出的事件名，对应@后面的事件名
+    // 参数列表对应@后面的参数列表
+    this.emit('事件名', 参数列表)
+  })
+```
+
+上面列举了jQvm中的三种事件使用场景，只有这三种！
+
+### 行为函数
+
+和jQuery的事件回调函数不同，jQvm的行为函数由两层柯里函数组成。具体如下：
+
+```js
+// state: 当前vm中对应的state
+// ...args: 参数列表，对应上面行为函数后面的参数列表
+function action(state, ...args) {
+  // this指向view
+  // 你可以在这里执行类似`view.unmount()`这样的操作
+  const view = this
+
+  state.some = 'next' // `some`必须在initState中定义好，否则不会有响应式更新界面效果
+  // 当然，jQvm提供了解决办法，你可以通过调用`state.$set('some', 'next')`来添加那些没有在initState中定义的属性
+  // 修改state触发更新支持异步，例如setTimeout(() => state.some = 'next', 1000)也是正常工作的
+  // 如果你自己写了一个类，并且把它的实例作为state上的属性，那么修改这个实例是没有办法触发更新的，你需要手动调用`view.update()`来触发更新，
+  // 例如`state.myIns.name = 'new name'; view.update()`
+
+  // 如果是用于事件绑定，action的返回值也必须是一个函数，这个函数将被作为事件的回调函数，你可以在它里面接收event对象作为参数
+  // 不过，handle函数是可选的，不返回任何内容也是可以的，只是这样你就无法拿到event对象。
+  // 可以对接jquery的事件系统，你甚至可以通过jquery的trigger来触发它
+  return function handle(e) {
+    const el = e.target
+    const $el = $(this) // el === this
+  }
+}
+```
+
+### 举例说明
+
+**第一种**
+
+```html
+<template id="app">
+  <div class="title">{{title}}</div>
+  <button>change</button>
+</template>
+
+<script>
+  $('#app')
+    .vm({ title: 'Default Title' })
+    .on('click', 'button', (state) => {
+      state.title = 'New Title'
+      // 这里的handle函数是可选的可以不返回也行
+      // 如果返回的情况下，将会按照jquery的方式进行执行，类似于在jquery里面 .on('click', 'button', (e) => e.preventDefault)
+      return (e) => {
+        e.preventDefault()
+      }
+    })
+    .mount()
+</script>
+```
+
+上面的这种方式通过类似jquery的事件绑定形式，直接接管DOM的点击事件。
+
+**第二种**
+
+```html
+<template id="app">
+  <div>{{title}}</div>
+  <button jq-on="click:change(id)"></button>
+</template>
+
+<script>
+  $('#app')
+    .vm({ title: 'Title' })
+    .fn('change', (state, id) => {
+      state.title = 'Title of ' + id
+    })
+    .mount()
+</script>
+```
+
+上面这种方式通过在模板中使用jq-on进行事件绑定，可以比较好的传递一些局部的参数进来。
+
+**第三种**
+
+```html
+<template id="app">
+  <div>{{title}}</div>
+  <some-component @change="handleChange(id)"></some-component>
+</template>
+
+<template id="component">
+  <button jq-on="click:handleClick(id)"></button>
+</template>
+
+<script>
+  const component = $('#comonent').vm({ id: 1 })
+    .fn('handleClick', function(state, id) {
+      this.emit('change', id)
+    })
+
+  $('#app')
+    .vm({ title: 'Title' })
+    .component('some-component', component)
+    .fn('handleChange', (state, id) => {
+      state.title = 'Title of ' + id
+    })
+    .mount()
+</script>
+```
+
+上面这种方式演示了使用@来承接组件抛出的事件。它其实有两个部分，第一个部分是component的部分，其中核心代码是`this.emit('change', id)`，用来抛出change事件；另一部分是app中使用`@change`来接住component中抛出的该事件，承接时，通过handleChange(id)接住了由emit抛出来的id值。
+
+
+### 内置事件
+
+除了组件的自定义的事件和DOM事件，jQvm的vm内也有一些事件，它们是：
+
+- $init: 实例化view时被触发，整个生命周期只会被触发一次
+- $mount: 调用`view.mount()`时触发
+- $unmount: 调用`view.unmount()`时触发
+- $render: view的内容被完全渲染后触发
+- $change: state变化后触发
+- $destroy: view被销毁时触发（仅支持手动调用view.destroy来销毁view）
+
+这些内置事件需要使用`on`来监听：
+
+```js
+$('#app')
+  .vm({ name: 'some' })
+  .on('$mount', state => {
+    state.name = 'new name'
+  })
+  .mount()
+```
 
 ## :bread: 过滤器
 
@@ -524,10 +581,11 @@ view.filter('number', number)
 我们可以通过view的plugin方法来完成一些复杂的集合处理，可以让我们把一些逻辑复杂的但关系紧密的操作，集合在一起，提供给view使用。你可以理解为插件就是多个view方法调用的封装。
 
 ```js
-function somePlugin(view) {
+function somePlugin(context) {
   // 返回生命周期事件的集合，在这些事件节点上，对view作统一处理
   return {
     $init: () => {
+      const { view, state } = context
       ...
     },
     $destroy: () => {
@@ -540,7 +598,7 @@ $(...).vm({ ... })
   .plugin(somePlugin)
 ```
 
-插件本身是一个函数，接收view作为参数，返回一个以view生命周期事件（以$开头的内置事件）为key的对象，并规定对应生命周期事件要做的事情。
+插件本身是一个函数，返回一个以view生命周期事件（以$开头的内置事件）为key的对象，并规定对应生命周期事件要做的事情。
 
 ## 状态管理
 
@@ -736,7 +794,7 @@ fs.writeFileSync(.., content)
 
 这样就可以获得一个独立的js文件了。
 
-## Router
+## 路由
 
 ```js
 const { createRouter } = window.jqvm
@@ -746,9 +804,9 @@ $(`
   <template>
     <div jq-route="'/'">
       home
-      <a href="/admin/{{id}}" jq-navigate="push">admin</a>
+      <a href="/admin?id={{$route.params.id}}" jq-navigate>admin</a>
     </div>
-    <div jq-route="/^\/admin\/\d+/">
+    <div jq-route="/^\/admin\?id=\d+/">
       admin
       <a jq-navigate="back">back</a>
     </div>
@@ -762,18 +820,12 @@ $(`
 
 - `createRouter({ mode: 'history' | 'hash', baseUri: '/xxx' })` mode 默认是 hash，可以都不传
 - `view.plugin(router)`
+- `{{$route.params.id}}` state上会多出一个$route，可以在视图内使用
 - `jq-route="exp"` 用于匹配路由的指令，由于它是表达式，因此你可以传入正则表达式进行匹配
-- `jq-navigate` 用于规定跳转方法的指令，只能作用于a标签上，可选方法有：`push | replace | open | back | forward`
+- `jq-navigate` 用于规定跳转方法的指令，只能作用于a标签上，可选方法有：`push | replace | open | back | forward` 默认是 `push`
+- `this.$router` view上会多出一个$router，用于在视图内的函数里面读取当前router
 
-其中，在`jq-route`指令内部，你可以使用 `$route.params` 读取当前路由下的参数。例如：
-
-```html
-<div jq-route="/\/some\?id=.*?/">
-  {{$route.params.id}}
-</div>
-```
-
-插件会使得view上多出一个router属性，你可以自己调用它的方法来进行某些处理。
+对于`this.$router`，它拥有以下方法：
 
 - getUrl(): string 获取当前路由指向的url
 - getLocation(): { pathname: string, search: string, params: object } 其中params是对search解析后得到的对象
