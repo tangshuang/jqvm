@@ -185,13 +185,7 @@ function compile($root, components, directives, state, view, [template, scope, i
     els.forEach(el => el.__jQvmCompiledRecord = record)
   }
 
-  components.forEach(([name, compile, affect]) => {
-    if (name === 'slot') {
-      return
-    }
-    const $els = $element.find(name)
-    $els.each(createIterator(compile, affect))
-  })
+  // directives have higher priority than components
 
   directives.forEach(([name, onCompile, onAffect]) => {
     const $els = $element.find(`[${name}]`)
@@ -226,6 +220,14 @@ function compile($root, components, directives, state, view, [template, scope, i
       records.push(record)
       els.forEach(el => el.__jQvmCompiledRecord = record)
     })
+  })
+
+  components.forEach(([name, compile, affect]) => {
+    if (name === 'slot') {
+      return
+    }
+    const $els = $element.find(name)
+    $els.each(createIterator(compile, affect))
   })
 
   interpolate($element, scope)
