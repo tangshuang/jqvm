@@ -17,7 +17,7 @@
 
 ## :hear_no_evil:  What's all the jQvm?
 
-JQvm is a library, a jQuery plugin, a frontend reactive view-model framework, which helps JavasScript developers who are familiar with jQuery code more quickly. Boring with React, Vue? Want to taste reactive programming in frontend? Believe me, if you have learned jQuery, you can setup a small application in 10 seconds!
+JQvm is a library, a jQuery plugin, a frontend reactive view-model framework, which helps JavaScript developers who are familiar with jQuery code more quickly. Boring with React, Vue? Want to taste reactive programming in frontend? Believe me, if you have learned jQuery, you can setup a small application in 10 seconds!
 
 ## :rocket: Install
 
